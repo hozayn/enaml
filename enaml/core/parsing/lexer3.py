@@ -5,6 +5,8 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
+from future.builtins import bytes
+
 from .base_lexer import BaseEnamlLexer
 
 
@@ -18,3 +20,22 @@ class Python3EnamlLexer(BaseEnamlLexer):
                     [('nonlocal', 'NONLOCAL'),
                      ]
                     )
+
+    def format_string(self, string, quote_type):
+        """Python support u r and b as quote type.
+
+        """
+        if quote_type == "" or quote_type == "u" or quote_type == "ur":
+            u8 = string.encode('utf-8')
+            if quote_type == "ur":
+                aux = u8.decode('raw_unicode_escape')
+            else:
+                aux = u8.decode('unicode_escape')
+            return aux.encode('latin-1').decode('utf-8')
+        elif quote_type == "r":
+            return string
+        elif quote_type == "b":
+            return bytes(string)
+        else:
+            msg = 'Unknown string quote type: %r' % quote_type
+            raise AssertionError(msg)

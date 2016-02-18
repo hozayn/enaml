@@ -338,7 +338,7 @@ class BaseEnamlLexer(object):
     # TRIPLEQ1 strings
     #--------------------------------------------------------------------------
     def t_start_triple_quoted_q1_string(self, t):
-        r"[uU]?[rR]?'''"
+        r"[uU]?[rR]?[bB]?'''"
         t.lexer.push_state("TRIPLEQ1")
         t.type = "STRING_START_TRIPLE"
         if "r" in t.value or "R" in t.value:
@@ -374,7 +374,7 @@ class BaseEnamlLexer(object):
     # TRIPLEQ2 strings
     #--------------------------------------------------------------------------
     def t_start_triple_quoted_q2_string(self, t):
-        r'[uU]?[rR]?"""'
+        r'[uU]?[rR]?[bB]?"""'
         t.lexer.push_state("TRIPLEQ2")
         t.type = "STRING_START_TRIPLE"
         if "r" in t.value or "R" in t.value:
@@ -410,7 +410,7 @@ class BaseEnamlLexer(object):
     # SINGLEQ1 strings
     #--------------------------------------------------------------------------
     def t_start_single_quoted_q1_string(self, t):
-        r"[uU]?[rR]?'"
+        r"[uU]?[rR]?[bB]?"'
         t.lexer.push_state("SINGLEQ1")
         t.type = "STRING_START_SINGLE"
         if "r" in t.value or "R" in t.value:
@@ -440,7 +440,7 @@ class BaseEnamlLexer(object):
     # SINGLEQ2 strings
     #--------------------------------------------------------------------------
     def t_start_single_quoted_q2_string(self, t):
-        r'[uU]?[rR]?"'
+        r'[uU]?[rR]?[bB]?"'
         t.lexer.push_state("SINGLEQ2")
         t.type = "STRING_START_SINGLE"
         if "r" in t.value or "R" in t.value:
@@ -595,31 +595,20 @@ class BaseEnamlLexer(object):
                     msg = msg % 'single'
                 syntax_error(msg, start_tok)
 
-            # Parse the quoted string.
-            #
-            # The four combinations are:
-            #  "ur"  - raw_unicode_escape
-            #  "u"   - unicode_escape
-            #  "r"   - no need to do anything
-            #  ""    - string_escape
             s = "".join(tok.value for tok in string_toks)
             quote_type = start_tok.value.lower()
-            if quote_type == "" or quote_type == "u":
-                s = s.encode('utf-8').decode('unicode_escape').encode('latin-1').decode('utf-8')
-                #s = s.decode("unicode_escape")
-            elif quote_type == "ur":
-                s = s.encode('utf-8').decode('raw_unicode_escape').encode('latin-1').decode('utf-8')
-                #s = s.decode("raw_unicode_escape")
-            elif quote_type == "r":
-                s = s
-            else:
-                msg = 'Unknown string quote type: %r' % quote_type
-                raise AssertionError(msg)
+            s = self.format_string(s, quote_type)
 
             start_tok.type = "STRING"
             start_tok.value = s
 
             yield start_tok
+
+    def format_string(self, string, quote_type):
+        """Format a string according to the leading quote_type (u, r, b).
+
+        """
+        raise NotImplementedError()
 
     # Keep track of indentation state
     #
