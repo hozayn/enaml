@@ -5,6 +5,11 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
+
+# try except DONE
+# with DONE
+# print exec REMOVED
+
 import ast
 import os
 import sys
@@ -1419,7 +1424,7 @@ class BaseEnamlParser(object):
         ret.value = value
         p[0] = ret
 
-# XXXX check python 2/3 difference on this
+# XXXX check python 2/3 difference on this (add back case 3 and for 4)
     def p_raise_stmt1(self, p):
         ''' raise_stmt : RAISE '''
         raise_stmt = ast.Raise()
@@ -1436,21 +1441,7 @@ class BaseEnamlParser(object):
         raise_stmt.tback = None
         p[0] = raise_stmt
 
-    def p_raise_stmt3(self, p):
-        ''' raise_stmt : RAISE test COMMA test '''
-        raise_stmt = ast.Raise()
-        raise_stmt.type = p[2]
-        raise_stmt.inst = p[4]
-        raise_stmt.tback = None
-        p[0] = raise_stmt
-
-    def p_raise_stmt4(self, p):
-        ''' raise_stmt : RAISE test COMMA test COMMA test '''
-        raise_stmt = ast.Raise()
-        raise_stmt.type = p[2]
-        raise_stmt.inst = p[4]
-        raise_stmt.tback = p[6]
-        p[0] = raise_stmt
+# XXXX add yield from for Python 3
 
     def p_yield_stmt(self, p):
         ''' yield_stmt : yield_expr '''
@@ -1719,10 +1710,13 @@ class BaseEnamlParser(object):
 
     def p_try_stmt1(self, p):
         ''' try_stmt : TRY COLON suite FINALLY COLON suite '''
-        try_finally = ast.Try()
+        if IS_PY3:
+            try_finally = ast.Try()
+            try_finally.handlers = []
+            try_finally.orelse = []
+        else:
+            try_finally = ast.TryFinally()
         try_finally.body = p[3]
-        try_finally.handlers = []
-        try_finally.orelse = []
         try_finally.finalbody = p[6]
         try_finally.lineno = p.lineno(1)
         ast.fix_missing_locations(try_finally)
@@ -1730,22 +1724,28 @@ class BaseEnamlParser(object):
 
     def p_try_stmt2(self, p):
         ''' try_stmt : TRY COLON suite except_clauses '''
-        try_stmt = ast.Try()
+        if IS_PY3:
+            try_stmt = ast.Try()
+            try_stmt.finalbody = []
+        else:
+            try_stmt = ast.TryExcept()
         try_stmt.body = p[3]
         try_stmt.handlers = p[4]
         try_stmt.orelse = []
-        try_stmt.finalbody = []
         try_stmt.lineno = p.lineno(1)
         ast.fix_missing_locations(try_stmt)
         p[0] = try_stmt
 
     def p_try_stmt3(self, p):
         ''' try_stmt : TRY COLON suite except_clauses ELSE COLON suite '''
-        try_stmt = ast.Try()
+        if IS_PY3:
+            try_stmt = ast.Try()
+            try_stmt.finalbody = []
+        else:
+            try_stmt = ast.TryExcept()
         try_stmt.body = p[3]
         try_stmt.handlers = p[4]
         try_stmt.orelse = p[7]
-        try_stmt.finalbody = []
         try_stmt.lineno = p.lineno(1)
         ast.fix_missing_locations(try_stmt)
         p[0] = try_stmt
@@ -1753,26 +1753,45 @@ class BaseEnamlParser(object):
     def p_try_stmt4(self, p):
         ''' try_stmt : TRY COLON suite except_clauses FINALLY COLON suite '''
         lineno = p.lineno(1)
-        try_stmt = ast.Try()
+        if IS_PY3:
+            try_finally = ast.Try()
+            try_stmt = try_finally
+        else:
+            try_finally = ast.TryFinally()
+            try_stmt = ast.TryExcept()
+            try_stmt.lineno = lineno
         try_stmt.body = p[3]
         try_stmt.handlers = p[4]
         try_stmt.orelse = []
-        try_stmt.finalbody = p[7]
-        try_stmt.lineno = lineno
-        ast.fix_missing_locations(try_stmt)
-        p[0] = try_stmt
+        if not IS_PY3:
+            ast.fix_missing_locations(try_stmt)
+            try_finally.body = [try_stmt]
+        try_finally.finalbody = p[7]
+        try_finally.lineno = lineno
+        ast.fix_missing_locations(try_finally)
+        p[0] = try_finally
 
     def p_try_stmt5(self, p):
         ''' try_stmt : TRY COLON suite except_clauses ELSE COLON suite FINALLY COLON suite '''
         lineno = p.lineno(1)
-        try_stmt = ast.Try()
+        if IS_PY3:
+            try_finally = ast.Try()
+            try_stmt = try_finally
+        else:
+            try_finally = ast.TryFinally()
+            try_stmt = ast.TryExcept()
+            try_stmt.lineno = lineno
         try_stmt.body = p[3]
         try_stmt.handlers = p[4]
         try_stmt.orelse = p[7]
-        try_stmt.finalbody = p[10]
-        try_stmt.lineno = lineno
-        ast.fix_missing_locations(try_stmt)
-        p[0] = try_stmt
+        if not IS_PY3:
+            try_stmt.lineno = lineno
+            ast.fix_missing_locations(try_stmt)
+            try_finally.body = [try_stmt]
+        try_finally.finalbody = p[10]
+        try_finally.lineno = lineno
+        ast.fix_missing_locations(try_finally)
+        p[0] = try_finally
 
     def p_except_clauses1(self, p):
         ''' except_clauses : except_clause except_clauses '''
@@ -1782,7 +1801,7 @@ class BaseEnamlParser(object):
         ''' except_clauses : except_clause '''
         p[0] = [p[1]]
 
-    def p_except_clause1(self, p):
+    def p_except_clause1(self,p):
         ''' except_clause : EXCEPT COLON suite '''
         excpt = ast.ExceptHandler()
         excpt.type = None
