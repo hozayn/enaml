@@ -224,10 +224,6 @@ class BaseEnamlLexer(object):
         'None': 'NONE',
     }
 
-    tokens = (delimiters +
-              tuple(val[1] for val in operators) +
-              tuple(reserved.values()))
-
     #--------------------------------------------------------------------------
     # Lexer States
     #--------------------------------------------------------------------------
@@ -489,6 +485,10 @@ class BaseEnamlLexer(object):
 
         _lex_dir = os.path.join(os.path.dirname(__file__), 'parse_tab')
         _lex_module = 'enaml.core.parsing.parse_tab.lextab%s' % self.lex_id
+
+        self.tokens = (self.delimiters +
+                       tuple(val[1] for val in self.operators) +
+                       tuple(self.reserved.values()))
 
         self.lexer = lex.lex(
             module=self, outputdir=_lex_dir, lextab=_lex_module,

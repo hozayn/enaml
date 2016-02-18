@@ -5,22 +5,16 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
-from .lexer3 import Python3EnamlLexer
+from .base_lexer import BaseEnamlLexer
 
 
-class Python35EnamlLexer(Python3EnamlLexer):
+class Python3EnamlLexer(BaseEnamlLexer):
     """Lexer specialized for Python > 3.5.
 
     """
+    operators = BaseEnamlLexer.operators + ('->', 'RETURNARROW')
 
-    lex_id = '35'
-
-    operators = Python3EnamlLexer.operators + (r'@=', 'ATEQUAL')
-
-    reserved = dict(list(Python3EnamlLexer.reserved.items()) +
-                    [('async', 'ASYNC'),
-                     ('await', 'AWAIT'),
+    reserved = dict(list(BaseEnamlLexer.reserved.items()) +
+                    [('nonlocal', 'NONLOCAL'),
                      ]
                     )
-
-    t_ATEQUAL = r'@='
