@@ -7,12 +7,15 @@
 #------------------------------------------------------------------------------
 import ast
 import os
+import sys
 
 import ply.yacc as yacc
 
 from .. import enaml_ast
 from ..base_lexer import (syntax_error, syntax_warning, BaseEnamlLexer,
                           ParsingError)
+
+IS_PY3 = sys.version_info >= (3,)
 
 # -----------------------------------------------------------------------------
 # Parsing Helpers
@@ -21,6 +24,52 @@ from ..base_lexer import (syntax_error, syntax_warning, BaseEnamlLexer,
 Store = ast.Store()
 Load = ast.Load()
 Del = ast.Del()
+
+
+# Python 2.6 compatibility. Transform set comprehension into set(generator)
+try:
+    SetComp = ast.SetComp
+except AttributeError:
+    def SetComp(elt, generators):
+        gen = ast.GeneratorExp(elt=elt, generators=generators)
+        call = ast.Call()
+        call.func = ast.Name(id='set', ctx=Load)
+        call.args = [gen]
+        call.keywords = []
+        call.starargs = None
+        call.kwargs = None
+        return call
+
+
+# Python 2.6 compatibility. Transform dict comprehension into dict(generator)
+try:
+    DictComp = ast.DictComp
+except AttributeError:
+    def DictComp(key, value, generators):
+        elt = ast.Tuple(elts=[key, value], ctx=Load)
+        gen = ast.GeneratorExp(elt=elt, generators=generators)
+        call = ast.Call()
+        call.func = ast.Name(id='dict', ctx=Load)
+        call.args = [gen]
+        call.keywords = []
+        call.starargs = None
+        call.kwargs = None
+        return call
+
+
+# Python 2.6 compatibility. Transform set literal in set(list_literal)
+try:
+    Set = ast.Set
+except AttributeError:
+    def Set(elts):
+        lst = ast.List(elts=elts, ctx=Load)
+        call = ast.Call()
+        call.func = ast.Name(id='set', ctx=Load)
+        call.args = [lst]
+        call.keywords = []
+        call.starargs = None
+        call.kwargs = None
+        return call
 
 
 class FakeToken(object):
@@ -157,7 +206,7 @@ class BaseEnamlParser(object):
     lexer = BaseEnamlLexer
 
     def __init__(self):
-        self.tokens = self.lexer.tokens
+        self.tokens = self.lexer().tokens
         # Get a save directory for the lex and parse tables
         parse_dir = os.path.join(os.path.dirname(__file__), 'parse_tab')
         parse_mod = 'enaml.core.parsing.parse_tab.parsetab%s' % self.parse_id
@@ -1231,7 +1280,6 @@ class BaseEnamlParser(object):
         node.expr = p[3]
         p[0] = node
 
-    # TODO go on
     # -------------------------------------------------------------------------
     # Python Grammar
     # -------------------------------------------------------------------------
@@ -1771,8 +1819,12 @@ class BaseEnamlParser(object):
         ''' with_stmt : WITH with_item COLON suite '''
         with_stmt = ast.With()
         ctxt, opt_vars = p[2]
-        with_stmt.items = [ast.withitem(context_expr=ctxt,
-                                        optional_vars=opt_vars)]
+        if IS_PY3:
+            with_stmt.items = [ast.withitem(context_expr=ctxt,
+                                            optional_vars=opt_vars)]
+        else:
+            with_stmt.context_expr = ctxt
+            with_stmt.optional_vars = opt_vars
         with_stmt.body = p[4]
         with_stmt.lineno = p.lineno(1)
         ast.fix_missing_locations(with_stmt)
@@ -1781,19 +1833,31 @@ class BaseEnamlParser(object):
     def p_with_stmt2(self, p):
         ''' with_stmt : WITH with_item with_item_list COLON suite '''
         with_stmt = ast.With()
-
-        items = list()
-        ctxt, opt_vars = p[2]
-        items.append(ast.withitem(context_expr=ctxt, optional_vars=opt_vars))
-        for ctxt, opt_vars in p[3]:
+        if IS_PY3:
+            items = list()
+            ctxt, opt_vars = p[2]
             items.append(ast.withitem(context_expr=ctxt,
                                       optional_vars=opt_vars))
+            for ctxt, opt_vars in p[3]:
+                items.append(ast.withitem(context_expr=ctxt,
+                                          optional_vars=opt_vars))
 
-        with_stmt.items = items
+            with_stmt.items = items
+        else:
+            ctxt, opt_vars = p[2]
+            with_stmt.context_expr = ctxt
+            with_stmt.optional_vars = opt_vars
+            last = with_stmt
+            for ctxt, opt_vars in p[3]:
+                with_stmt = ast.With()
+                with_stmt.context_expr = ctxt
+                with_stmt.optional_vars = opt_vars
+                last.body = [with_stmt]
+                last = with_stmt
         with_stmt.body = p[5]
         with_stmt.lineno = p.lineno(1)
         ast.fix_missing_locations(with_stmt)
-        p[0] = root  # XXXX what the hell !
+        p[0] = with_stmt
 
     def p_with_item1(self, p):
         ''' with_item : test '''
@@ -3396,31 +3460,6 @@ class BaseEnamlParser(object):
             lexer = lexer.lexer
         syntax_error(msg, FakeToken(lexer, t.lineno))
 
-
     # =========================================================================
     # End Parsing Rules
     # =========================================================================
-
-# Get a save directory for the lex and parse tables
-_parse_dir = os.path.join(os.path.dirname(__file__), 'parse_tab')
-_parse_module = 'enaml.core.parse_tab.parsetab'
-_parser = yacc.yacc(
-    debug=0, outputdir=_parse_dir, tabmodule=_parse_module, optimize=1,
-    errorlog=yacc.NullLogger(),
-)
-
-
-def parse(enaml_source, filename='Enaml'):
-    # All errors in the parsing and lexing rules are raised as a custom
-    # ParsingError. This exception object can be called to return the
-    # actual exception instance that should be raised. This is done
-    # because Ply enters an error recovery mode whenever a SyntaxError
-    # is raised from within a rule. We don't want error recovery, we'd
-    # rather just fail immediately. So this mechanism allows us to
-    # stop parsing immediately and then re-raise the errors outside
-    # of the control of Ply.
-    try:
-        lexer = EnamlLexer(filename)
-        return _parser.parse(enaml_source, debug=0, lexer=lexer)
-    except ParsingError as parse_error:
-        raise parse_error()
