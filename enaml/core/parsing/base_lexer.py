@@ -11,11 +11,6 @@ import tokenize
 import ply.lex as lex
 
 
-# Get a save directory for the lex and parse tables
-_lex_dir = os.path.join(os.path.dirname(__file__), 'parse_tab')
-_lex_module = 'enaml.core.parse_tab.lextab'
-
-
 #------------------------------------------------------------------------------
 # Lexing Helpers
 #------------------------------------------------------------------------------
@@ -111,7 +106,15 @@ def indentation_error(message, token):
 #------------------------------------------------------------------------------
 # Enaml Lexer
 #------------------------------------------------------------------------------
-class EnamlLexer(object):
+class BaseEnamlLexer(object):
+    """Base lexer for enaml file.
+
+    Compatible with Python 3.3 and 3.4
+
+    """
+
+    # Identifier used to generate unique lexing tables for different subclasses
+    lex_id = '3'
 
     operators = (
         (r'@', 'AT'),
@@ -156,7 +159,7 @@ class EnamlLexer(object):
         (r'=>', 'RIGHTARROW'),
     )
 
-    tokens = (
+    delimiters = (
         'COMMA',
         'DEDENT',
         'ENDMARKER',
@@ -196,7 +199,6 @@ class EnamlLexer(object):
         'elif': 'ELIF',
         'else': 'ELSE',
         'enamldef': 'ENAMLDEF',
-        'exec': 'EXEC',
         'except': 'EXCEPT',
         'finally': 'FINALLY',
         'from': 'FROM',
@@ -210,7 +212,6 @@ class EnamlLexer(object):
         'not': 'NOT',
         'or': 'OR',
         'pass': 'PASS',
-        'print': 'PRINT',
         'raise': 'RAISE',
         'return': 'RETURN',
         'template': 'TEMPLATE',
@@ -223,7 +224,7 @@ class EnamlLexer(object):
         'None': 'NONE',
     }
 
-    tokens = (tokens +
+    tokens = (delimiters +
               tuple(val[1] for val in operators) +
               tuple(reserved.values()))
 
@@ -485,8 +486,13 @@ class EnamlLexer(object):
     # Normal Class Items
     #--------------------------------------------------------------------------
     def __init__(self, filename='Enaml'):
+
+        _lex_dir = os.path.join(os.path.dirname(__file__), 'parse_tab')
+        _lex_module = 'enaml.core.parsing.parse_tab.lextab%s' % self.lex_id
+
         self.lexer = lex.lex(
-            module=self, outputdir=_lex_dir, lextab=_lex_module, optimize=1,
+            module=self, outputdir=_lex_dir, lextab=_lex_module,
+            optimize=1,
         )
         self.token_stream = None
         self.filename = filename
@@ -503,7 +509,7 @@ class EnamlLexer(object):
 
     def input(self, txt):
         self.lexer.input(txt)
-        self.next_token = self.make_token_stream().__next__
+        self.token_stream = self.make_token_stream()
 
         # State initialization
         self.paren_count = 0
@@ -512,7 +518,7 @@ class EnamlLexer(object):
 
     def token(self):
         try:
-            tok = self.next_token()
+            tok = next(self.token_stream)
             return tok
         except StopIteration:
             pass
@@ -770,4 +776,3 @@ class EnamlLexer(object):
         end_marker.lexpos = -1
         end_marker.lexer = self.lexer
         yield end_marker
-
