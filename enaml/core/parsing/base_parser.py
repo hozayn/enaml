@@ -17,7 +17,7 @@ import sys
 import ply.yacc as yacc
 
 from .. import enaml_ast
-from ..base_lexer import (syntax_error, syntax_warning, BaseEnamlLexer,
+from .base_lexer import (syntax_error, syntax_warning, BaseEnamlLexer,
                           ParsingError)
 
 IS_PY3 = sys.version_info >= (3,)
@@ -1366,7 +1366,6 @@ class BaseEnamlParser(object):
         ''' small_stmt_list_list : small_stmt_list_list SEMI small_stmt '''
         p[0] = p[1] + [p[3]]
 
-    # XXXX Subclass in Python 2 to add print and exec
     def p_small_stmt1(self, p):
         ''' small_stmt : expr_stmt
                        | del_stmt
@@ -1424,7 +1423,6 @@ class BaseEnamlParser(object):
         ret.value = value
         p[0] = ret
 
-# XXXX check python 2/3 difference on this (add back case 3 and for 4)
     def p_raise_stmt1(self, p):
         ''' raise_stmt : RAISE '''
         raise_stmt = ast.Raise()
@@ -1440,8 +1438,6 @@ class BaseEnamlParser(object):
         raise_stmt.inst = None
         raise_stmt.tback = None
         p[0] = raise_stmt
-
-# XXXX add yield from for Python 3
 
     def p_yield_stmt(self, p):
         ''' yield_stmt : yield_expr '''
@@ -1897,7 +1893,7 @@ class BaseEnamlParser(object):
         p[0] = [p[2]]
 
 # XXXX Python 3.5 add async funcdef
-# Check ast changes
+# XXXX for python 3 add support for annotation on return
     def p_funcdef(self, p):
         ''' funcdef : DEF NAME parameters COLON suite '''
         funcdef = ast.FunctionDef()
@@ -1911,12 +1907,14 @@ class BaseEnamlParser(object):
 
     def p_parameters1(self, p):
         ''' parameters : LPAR RPAR '''
-        p[0] = ast.arguments(args=[], defaults=[], vararg=None, kwonlyargs=[],
-                             kw_defaults=[], kwarg=None)
+        p[0] = self._make_args([])
 
+# XXXX in Python 3 this should be typedargslist (each elemnt being a tfpdef)
     def p_parameters2(self, p):
         ''' parameters : LPAR varargslist RPAR '''
         p[0] = p[2]
+
+# XXXX Py3 add kwargs
 
     def p_classdef1(self, p):
         ''' classdef : CLASS NAME COLON suite '''
@@ -1940,7 +1938,6 @@ class BaseEnamlParser(object):
         ast.fix_missing_locations(classdef)
         p[0] = classdef
 
-
     def p_classdef3(self, p):
         ''' classdef : CLASS NAME LPAR testlist RPAR COLON suite '''
         classdef = ast.ClassDef(keywords=[])
@@ -1955,7 +1952,7 @@ class BaseEnamlParser(object):
         ast.fix_missing_locations(classdef)
         p[0] = classdef
 
-# XXX add async func
+# XXX PY35 add async func
     def p_decorated(self, p):
         ''' decorated : decorators funcdef
                       | decorators classdef '''
@@ -2576,6 +2573,7 @@ class BaseEnamlParser(object):
         s = ast.Str(s=p[1])
         p[0] = s
 
+# XXXX Python 3.4+ only
     def p_atom11(self, p):
         ''' atom : NONE '''
         p[0] = ast.NameConstant(None)
@@ -3154,8 +3152,7 @@ class BaseEnamlParser(object):
 
     def p_old_lambdef1(self, p):
         ''' old_lambdef : LAMBDA COLON old_test '''
-        args = ast.arguments(args=[], defaults=[], vararg=None, kwonlyargs=[],
-                             kw_defaults=[], kwarg=None)
+        args = self._make_args([])
         body = p[3]
         p[0] = ast.Lambda(args=args, body=body)
 
@@ -3167,8 +3164,7 @@ class BaseEnamlParser(object):
 
     def p_lambdef1(self, p):
         ''' lambdef : LAMBDA COLON test '''
-        args = ast.arguments(args=[], defaults=[], vararg=None, kwonlyargs=[],
-                             kw_defaults=[], kwarg=None)
+        args = self._make_args([])
         body = p[3]
         p[0] = ast.Lambda(args=args, body=body)
 
@@ -3178,75 +3174,101 @@ class BaseEnamlParser(object):
         body = p[4]
         p[0] = ast.Lambda(args=args, body=body)
 
+    def _make_arg(self, arg, annotation=None, lineno=None):
+        """Build a argument node.
+
+        Parameters
+        ----------
+        arg : str
+            Name of the argument
+
+        annotation : ast.Node
+            Annotation (Python 3 only)
+
+        lineno :
+            Line number (Python 2 only)
+
+        """
+        raise NotImplementedError()
+#        if IS_PY3:
+#            return ast.arg(arg=arg, annotation=annotation)
+#        else:
+#            return ast.Name(id=arg, ctx=ast.Param(), lineno=lineno)
+
+    def _make_args(self, args, defaults=[], vararg=None, kwonlyargs=[],
+                   kw_defaults=[], kwarg=None):
+        """Build an ast node for function arguments.
+
+        """
+        # On Python 2 convert vararg and kwarg to raw name, raise error using
+        # lineno stored on the node and lexer from self.
+        # On Python 3.3 extract name and annotation
+        # After should be straight forward
+        raise NotImplementedError()
+
+    # We use fpdef everywhere here to re-use more easily those rules on
+    # Python 3 and be able to generate the typedargslist rules directly from
+    # them.
+    # This means however that we need to unpack the name on Python 2 for vararg
+    # and kwarg and ensure that we do not get a list.
+    # Note the comments of the rules below take into account the possibility
+    # to unpack a tuple in a function signature in Python 2.
+
+    # XXXX rework for PY2/3
     def p_varargslist1(self, p):
-        ''' varargslist : fpdef COMMA STAR NAME '''
+        ''' varargslist : fpdef COMMA STAR fpdef '''
         # def f(a, *args): pass
         # def f((a, b), *args): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[],
-                             vararg=ast.arg(arg=p[4], annotation=None),
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args([p[1]], vararg=p[4])
 
     def p_varargslist2(self, p):
-        ''' varargslist : fpdef COMMA STAR NAME COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef COMMA STAR fpdef COMMA DOUBLESTAR fpdef '''
         # def f(a, *args, **kwargs): pass
         # def f((a, b), *args, **kwargs): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[],
-                             vararg=ast.arg(arg=p[4], annotation=None),
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[7], annotation=None))
+        p[0] = self._make_args([p[1]], vararg=p[4], kwargs=p[7])
 
     def p_varargslist3(self, p):
-        ''' varargslist : fpdef COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef COMMA DOUBLESTAR fpdef '''
         # def f(a, **kwargs): pass
         # def f((a, b), **kwargs): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[], vararg=None,
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[4], annotation=None))
+        p[0] = self._make_args([p[1]], kwarg=p[4])
 
     def p_varargslist4(self, p):
         ''' varargslist : fpdef '''
         # def f(a): pass
         # def f((a, b)): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[], vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args([p[1]])
 
     def p_varargslist5(self, p):
         ''' varargslist : fpdef COMMA '''
         # def f(a,): pass
         # def f((a,b),): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[], vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args([p[1]])
 
     def p_varargslist6(self, p):
-        ''' varargslist : fpdef varargslist_list COMMA STAR NAME '''
+        ''' varargslist : fpdef varargslist_list COMMA STAR fpdef '''
         # def f((a, b), c, *args): pass
         # def f((a, b), c, d=4, *args): pass
         list_args, defaults = p[2]
         args = [p[1]] + list_args
-        p[0] = ast.arguments(args=args, defaults=defaults,
-                             vararg=ast.arg(arg=p[5], annotation=None),
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args=args, defaults=defaults, vararg=p[5])
 
     def p_varargslist7(self, p):
-        ''' varargslist : fpdef varargslist_list COMMA STAR NAME COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef varargslist_list COMMA STAR fpdef COMMA DOUBLESTAR fpdef '''
         # def f((a, b), c, *args, **kwargs): pass
         # def f((a, b), c, d=4, *args, **kwargs): pass
         list_args, defaults = p[2]
         args = [p[1]] + list_args
-        p[0] = ast.arguments(args=args, defaults=defaults,
-                             vararg=ast.arg(arg=p[5], annotation=None),
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[8], annotation=None))
+        p[0] = self._make_args(args=args, defaults=defaults, vararg=p[5],
+                               kwarg=p[8])
 
     def p_varargslist8(self, p):
-        ''' varargslist : fpdef varargslist_list COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef varargslist_list COMMA DOUBLESTAR fpdef '''
         # def f((a, b), c, **kwargs): pass
         # def f((a, b), c, d=4, **kwargs): pass
         list_args, defaults = p[2]
         args = [p[1]] + list_args
-        p[0] = ast.arguments(args=args, defaults=defaults, vararg=None,
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[5], annotation=None))
+        p[0] = self._make_args(args=args, defaults=defaults, kwarg=p[5])
 
     def p_varargslist9(self, p):
         ''' varargslist : fpdef varargslist_list '''
@@ -3254,8 +3276,7 @@ class BaseEnamlParser(object):
         # def f((a, b), c, d=4): pass
         list_args, defaults = p[2]
         args = [p[1]] + list_args
-        p[0] = ast.arguments(args=args, defaults=defaults, vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args, defaults=defaults)
 
     def p_varargslist10(self, p):
         ''' varargslist : fpdef varargslist_list COMMA '''
@@ -3263,51 +3284,41 @@ class BaseEnamlParser(object):
         # def f((a, b), c, d=4,): pass
         list_args, defaults = p[2]
         args = [p[1]] + list_args
-        p[0] = ast.arguments(args=args, defaults=defaults, vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args, defaults=defaults)
 
     def p_varargslist11(self, p):
-        ''' varargslist : fpdef EQUAL test COMMA STAR NAME '''
+        ''' varargslist : fpdef EQUAL test COMMA STAR fpdef '''
         # def f(a=1, *args): pass
         # def f((a,b)=(1,2), *args): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[p[3]],
-                             vararg=ast.arg(arg=p[6], annotation=None),
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args([p[1]], defaults=[p[3]], vararg=p[6])
 
     def p_varargslist12(self, p):
-        ''' varargslist : fpdef EQUAL test COMMA STAR NAME COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef EQUAL test COMMA STAR fpdef COMMA DOUBLESTAR fpdef '''
         # def f(a=1, *args, **kwargs): pass
         # def f((a,b)=(1,2), *args, **kwargs): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[p[3]],
-                             vararg=ast.arg(arg=p[6], annotation=None),
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[9], annotation=None))
+        p[0] = self._make_args([p[1]], defaults=[p[3]], vararg=p[6],
+                               kwarg=p[9])
 
     def p_varargslist13(self, p):
-        ''' varargslist : fpdef EQUAL test COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef EQUAL test COMMA DOUBLESTAR fpdef '''
         # def f(a=1, **kwargs): pass
         # def f((a,b)=(1,2), **kwargs): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[p[3]], vararg=None,
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[6], annotation=None))
+        p[0] = self._make_args(args=[p[1]], defaults=[p[3]], kwarg=p[6])
 
     def p_varargslist14(self, p):
         ''' varargslist : fpdef EQUAL test '''
         # def f(a=1): pass
         # def f((a,b)=(1,2)): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[p[3]],
-                             vararg=None, kwonlyargs=[], kw_defaults=[],
-                             kwarg=None)
+        p[0] = self._make_args(args=[p[1]], defaults=[p[3]])
 
     def p_varargslist15(self, p):
         ''' varargslist : fpdef EQUAL test COMMA '''
         # def f(a=1,): pass
         # def f((a,b)=(1,2),): pass
-        p[0] = ast.arguments(args=[p[1]], defaults=[p[3]], vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args=[p[1]], defaults=[p[3]])
 
     def p_varargslist16(self, p):
-        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR NAME '''
+        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR fpdef '''
         # def f(a=1, b=2, *args): pass
         list_args, list_defaults = p[4]
         if len(list_args) != len(list_defaults):
@@ -3316,12 +3327,10 @@ class BaseEnamlParser(object):
             syntax_error(msg, tok)
         args = [p[1]] + list_args
         defaults = [p[3]] + list_defaults
-        p[0] = ast.arguments(args=args, defaults=defaults,
-                             vararg=ast.arg(arg=p[7], annotation=None),
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args, defaults=defaults, vararg=p[7])
 
     def p_varargslist17(self, p):
-        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR NAME COMMA DOUBLESTAR NAME '''
+        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR fpdef COMMA DOUBLESTAR fpdef '''
         # def f(a=1, b=2, *args, **kwargs)
         list_args, list_defaults = p[4]
         if len(list_args) != len(list_defaults):
@@ -3330,10 +3339,8 @@ class BaseEnamlParser(object):
             syntax_error(msg, tok)
         args = [p[1]] + list_args
         defaults = [p[3]] + list_defaults
-        p[0] = ast.arguments(args=args, defaults=defaults,
-                             vararg=ast.arg(arg=p[7], annotation=None),
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[10], annotation=None))
+        p[0] = self._make_args(args, defaults=defaults, vararg=p[7],
+                               kwarg=p[10])
 
     def p_varargslist18(self, p):
         ''' varargslist : fpdef EQUAL test varargslist_list COMMA DOUBLESTAR NAME '''
@@ -3345,9 +3352,7 @@ class BaseEnamlParser(object):
             syntax_error(msg, tok)
         args = [p[1]] + list_args
         defaults = [p[3]] + list_defaults
-        p[0] = ast.arguments(args=args, defaults=defaults, vararg=None,
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[7], annotation=None))
+        p[0] = self._make_args(args, defaults=defaults, kwarg=p[7])
 
     def p_varargslist19(self, p):
         ''' varargslist : fpdef EQUAL test varargslist_list '''
@@ -3359,8 +3364,7 @@ class BaseEnamlParser(object):
             syntax_error(msg, tok)
         args = [p[1]] + list_args
         defaults = [p[3]] + list_defaults
-        p[0] = ast.arguments(args=args, defaults=defaults, vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args, defaults=defaults)
 
     def p_varargslist20(self, p):
         ''' varargslist : fpdef EQUAL test varargslist_list COMMA '''
@@ -3372,30 +3376,22 @@ class BaseEnamlParser(object):
             syntax_error(msg, tok)
         args = [p[1]] + list_args
         defaults = [p[3]] + list_defaults
-        p[0] = ast.arguments(args=args, defaults=defaults, vararg=None,
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args(args, defaults=defaults)
 
     def p_varargslist21(self, p):
-        ''' varargslist : STAR NAME '''
+        ''' varargslist : STAR fpdef '''
         # def f(*args): pass
-        p[0] = ast.arguments(args=[], defaults=[],
-                             vararg=ast.arg(arg=p[2], annotation=None),
-                             kwonlyargs=[], kw_defaults=[], kwarg=None)
+        p[0] = self._make_args([], vararg=p[2])
 
     def p_varargslist22(self, p):
-        ''' varargslist : STAR NAME COMMA DOUBLESTAR NAME '''
+        ''' varargslist : STAR fpdef COMMA DOUBLESTAR fpdef '''
         # def f(*args, **kwargs): pass
-        p[0] = ast.arguments(args=[], defaults=[],
-                             vararg=ast.arg(arg=p[2], annotation=None),
-                             kwonlyargs=[], kw_defaults=[],
-                             kwarg=ast.arg(arg=p[5], annotation=None))
+        p[0] = self._make_args(args=[], vararg=p[2], kwarg=p[5])
 
     def p_varargslist23(self, p):
-        ''' varargslist : DOUBLESTAR NAME '''
+        ''' varargslist : DOUBLESTAR fpdef '''
         # def f(**kwargs): pass
-        p[0] = ast.arguments(args=[], defaults=[], vararg=None, kwonlyargs=[],
-                             kw_defaults=[],
-                             kwarg=ast.arg(arg=p[2], annotation=None))
+        p[0] = self._make_args([], kwarg=p[2])
 
     # The varargslist_list handlers return a 2-tuple of (args, defaults) lists
     def p_varargslist_list1(self, p):
@@ -3423,12 +3419,16 @@ class BaseEnamlParser(object):
         defaults = list_defaults + [p[5]]
         p[0] = (args, defaults)
 
-    # XXXX Python 3 not Python 2
+    # XXXX Python 3 add support for function annotation add tfpdef
     def p_fpdef1(self, p):
         ''' fpdef : NAME '''
-        p[0] = ast.arg(arg=p[1], annotation=None)
-        #p[0] = ast.Name(id=p[1], ctx=ast.Param(), lineno=p.lineno(1))
+        raise NotImplementedError()
+#        if IS_PY3:
+#            p[0] = ast.arg(arg=p[1], annotation=None)
+#        else:
+#            p[0] = ast.Name(id=p[1], ctx=ast.Param(), lineno=p.lineno(1))
 
+# XXXX all the followings are only valid on Python2
     def p_fpdef2(self, p):
         ''' fpdef : LPAR fplist RPAR '''
         # fplist will return a NAME or a TUPLE, so we don't need that
