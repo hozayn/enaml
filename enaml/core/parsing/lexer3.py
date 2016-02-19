@@ -11,11 +11,9 @@ from .base_lexer import BaseEnamlLexer
 
 
 class Python3EnamlLexer(BaseEnamlLexer):
-    """Lexer specialized for Python > 3.5.
+    """Lexer specialized for Python.
 
     """
-    operators = BaseEnamlLexer.operators + ('->', 'RETURNARROW')
-
     reserved = dict(list(BaseEnamlLexer.reserved.items()) +
                     [('nonlocal', 'NONLOCAL'),
                      ]
@@ -39,3 +37,33 @@ class Python3EnamlLexer(BaseEnamlLexer):
         else:
             msg = 'Unknown string quote type: %r' % quote_type
             raise AssertionError(msg)
+
+
+class Python34EnamlLexer(Python3EnamlLexer):
+    """Lexer specialized for Python.
+
+    """
+    reserved = dict(list(Python3EnamlLexer.reserved.items()) +
+                    [('True', 'TRUE'),
+                     ('False', 'FALSE'),
+                     ('None', 'NONE'),
+                     ]
+                    )
+
+
+class Python35EnamlLexer(Python34EnamlLexer):
+    """Lexer specialized for Python > 3.5.
+
+    """
+
+    lex_id = '35'
+
+    operators = Python3EnamlLexer.operators + (r'@=', 'ATEQUAL')
+
+    reserved = dict(list(Python3EnamlLexer.reserved.items()) +
+                    [('async', 'ASYNC'),
+                     ('await', 'AWAIT'),
+                     ]
+                    )
+
+    t_ATEQUAL = r'@='

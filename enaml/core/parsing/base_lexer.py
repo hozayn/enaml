@@ -219,9 +219,6 @@ class BaseEnamlLexer(object):
         'while': 'WHILE',
         'with': 'WITH',
         'yield': 'YIELD',
-        'True': 'TRUE',
-        'False': 'FALSE',
-        'None': 'NONE',
     }
 
     #--------------------------------------------------------------------------
