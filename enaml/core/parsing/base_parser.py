@@ -1893,7 +1893,6 @@ class BaseEnamlParser(object):
         p[0] = [p[2]]
 
 # XXXX Python 3.5 add async funcdef
-# XXXX for python 3 add support for annotation on return
     def p_funcdef(self, p):
         ''' funcdef : DEF NAME parameters COLON suite '''
         funcdef = ast.FunctionDef()
@@ -1909,7 +1908,6 @@ class BaseEnamlParser(object):
         ''' parameters : LPAR RPAR '''
         p[0] = self._make_args([])
 
-# XXXX in Python 3 this should be typedargslist (each elemnt being a tfpdef)
     def p_parameters2(self, p):
         ''' parameters : LPAR varargslist RPAR '''
         p[0] = p[2]
@@ -2572,19 +2570,6 @@ class BaseEnamlParser(object):
         ''' atom : atom_string_list '''
         s = ast.Str(s=p[1])
         p[0] = s
-
-# XXXX Python 3.4+ only
-    def p_atom11(self, p):
-        ''' atom : NONE '''
-        p[0] = ast.NameConstant(None)
-
-    def p_atom12(self, p):
-        ''' atom : FALSE '''
-        p[0] = ast.NameConstant(False)
-
-    def p_atom13(self, p):
-        ''' atom : TRUE '''
-        p[0] = ast.NameConstant(True)
 
     def p_atom_string_list1(self, p):
         ''' atom_string_list : STRING '''
