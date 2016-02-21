@@ -108,11 +108,12 @@ class Python3EnamlParser(BaseEnamlParser):
         classdef = ast.ClassDef(keywords=[])
         classdef.name = p[2]
 
-        # XXXX modifiy analysis to extract the arguments
-        bases = p[4]
-        if not isinstance(bases, list):
-            bases = [bases]
-        classdef.bases = bases
+        args = p[4]  # This is an Arguments instance
+        classdef.bases = args.args
+        classdef.keywords = args.keywords
+        classdef.starargs = args.starargs
+        classdef.kwargs = args.kwargs
+
         classdef.body = p[7]
         classdef.decorator_list = []
         classdef.lineno = p.lineno(1)
@@ -143,13 +144,41 @@ class Python3EnamlParser(BaseEnamlParser):
         """Build an ast node for function arguments.
 
         """
-        # On Python 3.3 extract name and annotation
-        # After should be straight forward
-        raise NotImplementedError()
+        # This is valid only for Python 3.3
+        va = vararg.annotation if vararg else None
+        vararg = vararg.arg if vararg else None
+        ka = kwarg.annotation if kwarg else None
+        kwarg = kwarg.arg if kwarg else None
+
+        return ast.arguments(args=args, defaults=defaults, vararg=vararg,
+                             varargannotation=va, kwonlyargs=kwonlyargs,
+                             kw_defaults=kw_defaults, kwarg=kwarg,
+                             kwargannotation=ka)
 
     # XXXX add rules for kw only
 
-    # XXXX Python 3 add support for function annotation add tfpdef
+    def p_tfpdef1(self, p):
+        ''' tfpdef : NAME '''
+        p[0] = self._make_arg(p[1])
 
-# XXXX Use an iteration on vararg and vararglist rules to generate typedarg
-# and typedarglist rules
+    def p_tfpdef2(self, p):
+        ''' tfpdef : NAME COLON test'''
+        p[0] = self._make_arg(p[1], annotations=p[3])
+
+
+def _make_typedarg_rule(func):
+    """Copy a rule and allow for annotations.
+
+    """
+    def rule(self, p):
+        return func(self, p)
+
+    new_doc = func.__doc__.replace('fpdef', 'tfpdef')
+    new_doc.replace('varargslist', 'typedargslist')
+    rule.__doc__ = new_doc
+    return rule
+
+
+for f in filter(lambda x: 'varargslist' in x, dir(Python3EnamlParser)):
+    setattr(f.replace('varargslist', 'typedargslist'),
+            _make_typedarg_rule(getattr(Python3EnamlParser, f)))
