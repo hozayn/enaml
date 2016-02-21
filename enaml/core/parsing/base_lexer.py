@@ -407,7 +407,7 @@ class BaseEnamlLexer(object):
     # SINGLEQ1 strings
     #--------------------------------------------------------------------------
     def t_start_single_quoted_q1_string(self, t):
-        r"[uU]?[rR]?[bB]?"'
+        r"[uU]?[rR]?[bB]?"
         t.lexer.push_state("SINGLEQ1")
         t.type = "STRING_START_SINGLE"
         if "r" in t.value or "R" in t.value:
