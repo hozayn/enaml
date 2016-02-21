@@ -7,7 +7,8 @@
 #------------------------------------------------------------------------------
 import ast
 
-from .base_parser import BaseEnamlParser
+from .lexer2 import Python2EnamlLexer
+from .base_parser import BaseEnamlParser, Store, FakeToken, syntax_error
 
 
 class Python2EnamlParser(BaseEnamlParser):
@@ -18,6 +19,8 @@ class Python2EnamlParser(BaseEnamlParser):
     - old style exception raising
 
     """
+
+    lexer = Python2EnamlLexer
 
     def p_small_stmt1(self, p):
         ''' small_stmt : expr_stmt
@@ -160,3 +163,99 @@ class Python2EnamlParser(BaseEnamlParser):
         raise_stmt.inst = p[4]
         raise_stmt.tback = p[6]
         p[0] = raise_stmt
+
+    def p_classdef3(self, p):
+        ''' classdef : CLASS NAME LPAR testlist RPAR COLON suite '''
+        classdef = ast.ClassDef(keywords=[])
+        classdef.name = p[2]
+        bases = p[4]
+        if not isinstance(bases, list):
+            bases = [bases]
+        classdef.bases = bases
+        classdef.body = p[7]
+        classdef.decorator_list = []
+        classdef.lineno = p.lineno(1)
+        ast.fix_missing_locations(classdef)
+        p[0] = classdef
+
+    def _make_arg(self, arg, annotation=None, lineno=None):
+        """Build a argument node.
+
+        Parameters
+        ----------
+        arg : str
+            Name of the argument
+
+        annotation : ast.Node
+            Annotation (Python 3 only)
+
+        lineno :
+            Line number (Python 2 only)
+
+        """
+        return ast.Name(id=arg, ctx=ast.Param(), lineno=lineno)
+
+    def _make_args(self, args, defaults=[], vararg=None, kwonlyargs=[],
+                   kw_defaults=[], kwarg=None):
+        """Build an ast node for function arguments.
+
+        """
+        if vararg is not None:
+            if isinstance(vararg, ast.Name):
+                vararg = vararg.id
+            else:  # This is a tuple
+                msg = "cannot use list as *arg"
+                tok = FakeToken(self.lexer.lexer, vararg.lineno)
+                syntax_error(msg, tok)
+
+        if kwarg is not None:
+            if isinstance(kwarg, ast.Name):
+                kwarg = kwarg.id
+            else:  # This is a tuple
+                msg = "cannot use list as **kwarg"
+                tok = FakeToken(self.lexer.lexer, kwarg.lineno)
+                syntax_error(msg, tok)
+
+        return ast.Arguments(args=args, defaults=defaults, vararg=vararg,
+                             kwarg=kwarg)
+
+    def p_fpdef2(self, p):
+        ''' fpdef : LPAR fplist RPAR '''
+        # fplist will return a NAME or a TUPLE, so we don't need that
+        # logic here.
+        p[0] = p[2]
+
+    def p_fplist1(self, p):
+        ''' fplist : fpdef '''
+        p[0] = p[1]
+
+    def p_fplist2(self, p):
+        ''' fplist : fpdef COMMA '''
+        tup = ast.Tuple()
+        tup.elts = [p[1]]
+        self.set_context(tup, Store, p)
+        p[0] = tup
+
+    def p_fplist3(self, p):
+        ''' fplist : fpdef fplist_list '''
+        elts = [p[1]] + p[2]
+        tup = ast.Tuple()
+        tup.elts = elts
+        self.set_context(tup, Store, p)
+        p[0] = tup
+
+    def p_fplist4(self, p):
+        ''' fplist : fpdef fplist_list COMMA '''
+        elts = [p[1]] + p[2]
+        tup = ast.Tuple()
+        tup.elts = elts
+        self.set_context(tup, Store, p)
+        p[0] = tup
+
+    def p_fplist_list1(self, p):
+        ''' fplist_list : COMMA fpdef '''
+        p[0] = [p[2]]
+
+    def p_fplist_list2(self, p):
+        ''' fplist_list : fplist_list COMMA fpdef '''
+        p[0] = p[1] + [p[3]]

@@ -739,7 +739,6 @@ class BaseEnamlParser(object):
                                       lineno=lineno)
 
     # The disallowed ast types on the rhs of a :: operator
-    # XXXX on 3.5 need to disallow the async funcdef
     _NOTIFICATION_DISALLOWED = {
         ast.FunctionDef: 'function definition',
         ast.ClassDef: 'class definition',
@@ -1093,9 +1092,8 @@ class BaseEnamlParser(object):
         node.name = p[1]
         node.arguments = p[2]
         node.body = [_f for _f in [p[4]] if _f]
-        self_validate_template_inst(node, p.lexer.lexer)
+        self._validate_template_inst(node, p.lexer.lexer)
         p[0] = node
-
 
     def p_template_inst_impl2(self, p):
         ''' template_inst_impl : NAME template_args COLON template_ids COLON template_inst_suite_item '''
@@ -1427,16 +1425,22 @@ class BaseEnamlParser(object):
         ''' raise_stmt : RAISE '''
         raise_stmt = ast.Raise()
         raise_stmt.type = None
-        raise_stmt.inst = None
-        raise_stmt.tback = None
+        if IS_PY3:
+            raise_stmt.cause = None
+        else:
+            raise_stmt.inst = None
+            raise_stmt.tback = None
         p[0] = raise_stmt
 
     def p_raise_stmt2(self, p):
         ''' raise_stmt : RAISE test '''
         raise_stmt = ast.Raise()
         raise_stmt.type = p[2]
-        raise_stmt.inst = None
-        raise_stmt.tback = None
+        if IS_PY3:
+            raise_stmt.cause = None
+        else:
+            raise_stmt.inst = None
+            raise_stmt.tback = None
         p[0] = raise_stmt
 
     def p_yield_stmt(self, p):
@@ -1525,7 +1529,6 @@ class BaseEnamlParser(object):
         assg.value = value
         p[0] = assg
 
-# XXXX reimplement on python 3.5 for ATEQUAL
     def p_augassign(self, p):
         ''' augassign : AMPEREQUAL
                       | CIRCUMFLEXEQUAL
@@ -1577,7 +1580,6 @@ class BaseEnamlParser(object):
         ''' testlist_list : testlist_list COMMA test '''
         p[0] = p[1] + [p[3]]
 
-# XXXX on python 3.5 add async funcdef
     def p_compound_stmt(self, p):
         ''' compound_stmt : if_stmt
                           | while_stmt
@@ -1892,7 +1894,6 @@ class BaseEnamlParser(object):
         ''' with_item_list : COMMA with_item '''
         p[0] = [p[2]]
 
-# XXXX Python 3.5 add async funcdef
     def p_funcdef(self, p):
         ''' funcdef : DEF NAME parameters COLON suite '''
         funcdef = ast.FunctionDef()
@@ -1911,8 +1912,6 @@ class BaseEnamlParser(object):
     def p_parameters2(self, p):
         ''' parameters : LPAR varargslist RPAR '''
         p[0] = p[2]
-
-# XXXX Py3 add kwargs
 
     def p_classdef1(self, p):
         ''' classdef : CLASS NAME COLON suite '''
@@ -1936,21 +1935,6 @@ class BaseEnamlParser(object):
         ast.fix_missing_locations(classdef)
         p[0] = classdef
 
-    def p_classdef3(self, p):
-        ''' classdef : CLASS NAME LPAR testlist RPAR COLON suite '''
-        classdef = ast.ClassDef(keywords=[])
-        classdef.name = p[2]
-        bases = p[4]
-        if not isinstance(bases, list):
-            bases = [bases]
-        classdef.bases = bases
-        classdef.body = p[7]
-        classdef.decorator_list = []
-        classdef.lineno = p.lineno(1)
-        ast.fix_missing_locations(classdef)
-        p[0] = classdef
-
-# XXX PY35 add async func
     def p_decorated(self, p):
         ''' decorated : decorators funcdef
                       | decorators classdef '''
@@ -3199,7 +3183,6 @@ class BaseEnamlParser(object):
     # Note the comments of the rules below take into account the possibility
     # to unpack a tuple in a function signature in Python 2.
 
-    # XXXX rework for PY2/3
     def p_varargslist1(self, p):
         ''' varargslist : fpdef COMMA STAR fpdef '''
         # def f(a, *args): pass
@@ -3404,56 +3387,9 @@ class BaseEnamlParser(object):
         defaults = list_defaults + [p[5]]
         p[0] = (args, defaults)
 
-    # XXXX Python 3 add support for function annotation add tfpdef
     def p_fpdef1(self, p):
         ''' fpdef : NAME '''
-        raise NotImplementedError()
-#        if IS_PY3:
-#            p[0] = ast.arg(arg=p[1], annotation=None)
-#        else:
-#            p[0] = ast.Name(id=p[1], ctx=ast.Param(), lineno=p.lineno(1))
-
-# XXXX all the followings are only valid on Python2
-    def p_fpdef2(self, p):
-        ''' fpdef : LPAR fplist RPAR '''
-        # fplist will return a NAME or a TUPLE, so we don't need that
-        # logic here.
-        p[0] = p[2]
-
-    def p_fplist1(self, p):
-        ''' fplist : fpdef '''
-        p[0] = p[1]
-
-    def p_fplist2(self, p):
-        ''' fplist : fpdef COMMA '''
-        tup = ast.Tuple()
-        tup.elts = [p[1]]
-        self.set_context(tup, Store, p)
-        p[0] = tup
-
-    def p_fplist3(self, p):
-        ''' fplist : fpdef fplist_list '''
-        elts = [p[1]] + p[2]
-        tup = ast.Tuple()
-        tup.elts = elts
-        self.set_context(tup, Store, p)
-        p[0] = tup
-
-    def p_fplist4(self, p):
-        ''' fplist : fpdef fplist_list COMMA '''
-        elts = [p[1]] + p[2]
-        tup = ast.Tuple()
-        tup.elts = elts
-        self.set_context(tup, Store, p)
-        p[0] = tup
-
-    def p_fplist_list1(self, p):
-        ''' fplist_list : COMMA fpdef '''
-        p[0] = [p[2]]
-
-    def p_fplist_list2(self, p):
-        ''' fplist_list : fplist_list COMMA fpdef '''
-        p[0] = p[1] + [p[3]]
+        p[0] = self._make_arg(p[1])
 
     def p_error(self, t):
         msg = 'invalid syntax'
