@@ -5,8 +5,6 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
-from __future__ import unicode_literals
-
 from collections import defaultdict
 
 from atom.api import Atom, Instance, List, Typed
@@ -60,14 +58,14 @@ def solve_ordering(nodes):
         before = node.item.before
         if before:
             if before not in variables:
-                msg = "item '%s' has invalid `before` reference '%s'"
+                msg = u"item '%s' has invalid `before` reference '%s'"
                 raise ValueError(msg % (node.path, before))
             target_var = variables[before]
             constraints.append((this_var + 0.1 <= target_var) | 'strong')
         after = node.item.after
         if after:
             if after not in variables:
-                msg = "item '%s' has invalid `after` reference '%s'"
+                msg = u"item '%s' has invalid `after` reference '%s'"
                 raise ValueError(msg % (node.path, after))
             target_var = variables[after]
             constraints.append((target_var + 0.1 <= this_var) | 'strong')
@@ -104,9 +102,9 @@ class PathNode(Atom):
         """
         path = self.item.path.rstrip('/')
         if not path:
-            return '/'
-        if path[0] != '/':
-            return '/' + path
+            return u'/'
+        if path[0] != u'/':
+            return u'/' + path
         return path
 
     @property
@@ -114,15 +112,15 @@ class PathNode(Atom):
         """ Get the sanitized path of the parent node.
 
         """
-        path = self.path.rsplit('/', 1)[0]
-        return path or '/'
+        path = self.path.rsplit(u'/', 1)[0]
+        return path or u'/'
 
     @property
     def id(self):
         """ Get the id portion of the path.
 
         """
-        return self.path.rsplit('/', 1)[1]
+        return self.path.rsplit(u'/', 1)[1]
 
     def assemble(self):
         """ Assemble the menu or action object for the node.
@@ -173,7 +171,7 @@ class MenuNode(PathNode):
 
         for group in item_groups:
             if group.id in group_map:
-                msg = "menu item '%s' has duplicate group '%s'"
+                msg = u"menu item '%s' has duplicate group '%s'"
                 raise ValueError(msg % (self.path, group.id))
             group_map[group.id] = group
 
@@ -194,7 +192,7 @@ class MenuNode(PathNode):
         for child in self.children:
             target_group = child.item.group
             if target_group not in group_map:
-                msg = "item '%s' has invalid group '%s'"
+                msg = u"item '%s' has invalid group '%s'"
                 raise ValueError(msg % (child.path, target_group))
             grouped[target_group].append(child)
 
@@ -265,7 +263,7 @@ class RootMenuNode(MenuNode):
 
         """
         group = ItemGroup()
-        return {'': group}, [group]
+        return {u'': group}, [group]
 
     def assemble(self):
         """ Assemble and return the list of root menu bar menus.
@@ -308,17 +306,17 @@ def create_menus(workbench, menu_items, action_items):
     # assemble the menu nodes into a tree structure in two passes
     # in order to maintain the relative item definition order
     root = RootMenuNode()
-    node_map = {'/': root}
+    node_map = {u'/': root}
     for node in menu_nodes:
         path = node.path
         if path in node_map:
-            msg = "a menu item already exist for path '%s'"
+            msg = u"a menu item already exist for path '%s'"
             raise ValueError(msg % path)
         node_map[path] = node
     for node in menu_nodes:
         parent_path = node.parent_path
         if parent_path not in node_map:
-            msg = "the path '%s' does not point to a menu item"
+            msg = u"the path '%s' does not point to a menu item"
             raise ValueError(msg % parent_path)
         parent = node_map[parent_path]
         parent.children.append(node)
@@ -333,11 +331,11 @@ def create_menus(workbench, menu_items, action_items):
     for node in action_nodes:
         parent_path = node.parent_path
         if parent_path not in node_map:
-            msg = "the path '%s' does not point to a menu item"
+            msg = u"the path '%s' does not point to a menu item"
             raise ValueError(msg % parent_path)
         path = node.path
         if path in node_map:
-            msg = "an item already exist for path '%s'"
+            msg = u"an item already exist for path '%s'"
             raise ValueError(msg % path)
         parent = node_map[parent_path]
         parent.children.append(node)
