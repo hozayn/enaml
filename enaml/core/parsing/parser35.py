@@ -7,6 +7,7 @@
 #------------------------------------------------------------------------------
 import ast
 
+from .lexer3 import Python35EnamlLexer
 from .parser34 import Python34EnamlParser
 
 
@@ -17,6 +18,10 @@ class Python35EnamlParser(Python34EnamlParser):
 
 
     """
+    parser_id = '35'
+
+    lexer = Python35EnamlLexer
+
     augassign_table = dict(list(Python34EnamlParser.augassign_table.items()) +
                            [('@=', ast.MatMult)])
 
