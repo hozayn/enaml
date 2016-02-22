@@ -218,7 +218,7 @@ class Python2EnamlParser(BaseEnamlParser):
                 tok = FakeToken(self.lexer.lexer, kwarg.lineno)
                 syntax_error(msg, tok)
 
-        return ast.Arguments(args=args, defaults=defaults, vararg=vararg,
+        return ast.arguments(args=args, defaults=defaults, vararg=vararg,
                              kwarg=kwarg)
 
     def p_fpdef2(self, p):

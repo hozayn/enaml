@@ -64,6 +64,8 @@ for cmp_op, hasarg in opmap.items():
     __all__.append(cmp_op)
 cmp_op = opcode.cmp_op
 
+del __all__
+
 hasarg = {x for x in opcodes if x >= opcode.HAVE_ARGUMENT}
 hasconst = {Opcode(x) for x in opcode.hasconst}
 hasname = {Opcode(x) for x in opcode.hasname}
