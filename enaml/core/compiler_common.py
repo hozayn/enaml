@@ -13,6 +13,7 @@ import sys
 
 from atom.api import Str, Typed
 
+from ..compat import IS_PY3
 from . import byteplay as bp
 from .code_generator import CodeGenerator
 from .enaml_ast import (
@@ -362,7 +363,8 @@ def safe_eval_ast(cg, node, name, lineno, local_names):
         call_args = expr_cg.rewrite_to_fast_locals(local_names)
         expr_code = expr_cg.to_code()
         cg.load_const(expr_code)
-        cg.load_const(None)
+        if IS_PY3:
+            cg.load_const(None)
         cg.make_function()
         for arg in call_args:
             if arg in local_names:
@@ -407,7 +409,7 @@ def gen_child_def_node(cg, node, local_names):
     # Subclass the child class if needed
     store_types = (StorageExpr, AliasExpr, FuncDef)
     if any(isinstance(item, store_types) for item in node.body):
-        if sys.version_info < (3,):
+        if not IS_PY3:
             # On Python 2 directly build the class.
             cg.load_const(node.typename)
             cg.rot_two()
@@ -697,7 +699,7 @@ def _insert_decl_function(cg, funcdef):
 
     # extract the inner code object which represents the actual
     # function code and update its flags and global loads
-    if sys.version_info < (3,):
+    if not IS_PY3:
         inner = outer_ops[-2][1]  # Taken from original enaml code
     else:
         inner = outer_ops[-3][1]  # Taken from @peterazmanov branch

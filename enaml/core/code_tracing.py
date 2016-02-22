@@ -5,15 +5,13 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
-import sys
-
+from ..compat import IS_PY3
 from .byteplay import (
     LOAD_ATTR, LOAD_CONST, ROT_TWO, DUP_TOP, CALL_FUNCTION, POP_TOP, LOAD_FAST,
     BUILD_TUPLE, ROT_THREE, UNPACK_SEQUENCE, BINARY_SUBSCR, GET_ITER,
     LOAD_NAME, RETURN_VALUE
 )
 
-IS_PY3 = sys.version_info[0] >= 3
 
 if not IS_PY3:
     from .byteplay import DUP_TOPX

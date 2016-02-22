@@ -5,22 +5,15 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
-
-# try except DONE
-# with DONE
-# print exec REMOVED
-
 import ast
 import os
-import sys
 
 import ply.yacc as yacc
 
+from ...compat import IS_PY3
 from .. import enaml_ast
 from .base_lexer import (syntax_error, syntax_warning, BaseEnamlLexer,
                           ParsingError)
-
-IS_PY3 = sys.version_info >= (3,)
 
 # -----------------------------------------------------------------------------
 # Parsing Helpers

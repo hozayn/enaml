@@ -5,11 +5,11 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
-import sys
 from contextlib import contextmanager
 
 from atom.api import Atom, Bool, Int, List, Str
 
+from ..compat import IS_PY3
 from . import byteplay as bp
 
 
@@ -54,7 +54,7 @@ class CodeGenerator(Atom):
         """ Create a Python code object from the current code ops.
 
         """
-        if sys.version_info < (3,):
+        if not IS_PY3:
             bp_code = bp.Code(
                 self.code_ops, self.freevars, self.args, self.varargs,
                 self.varkwargs, self.newlocals, self.name, self.filename,
@@ -233,8 +233,7 @@ class CodeGenerator(Atom):
             (bp.STORE_SUBSCR, None),                    # TOS
         )
 
-    if sys.version_info < (3,):
-
+    if not IS_PY3:
         def build_class(self):
             """ Build a class from the top 3 stack items.
 
@@ -242,6 +241,7 @@ class CodeGenerator(Atom):
             self.code_ops.append(                           # TOS -> name -> bases -> dict
                 (bp.BUILD_CLASS, None),                     # TOS -> class
             )
+
     else:
         def load_build_class(self):
             """ Build a class from the top 3 stack items.
