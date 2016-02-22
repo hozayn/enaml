@@ -5,6 +5,7 @@
 #
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
+import sys
 from contextlib import contextmanager
 
 from atom.api import Atom, Bool, Int, List, Str
@@ -53,11 +54,18 @@ class CodeGenerator(Atom):
         """ Create a Python code object from the current code ops.
 
         """
-        bp_code = bp.Code(
-            self.code_ops, self.freevars, self.args, self.kwonlyargs, self.varargs,
-            self.varkwargs, self.newlocals, self.name, self.filename,
-            self.firstlineno, self.docstring or None
-        )
+        if sys.version_info < (3,):
+            bp_code = bp.Code(
+                self.code_ops, self.freevars, self.args, self.varargs,
+                self.varkwargs, self.newlocals, self.name, self.filename,
+                self.firstlineno, self.docstring or None
+                )
+        else:
+            bp_code = bp.Code(
+                self.code_ops, self.freevars, self.args, self.kwonlyargs,
+                self.varargs, self.varkwargs, self.newlocals, self.name,
+                self.filename, self.firstlineno, self.docstring or None
+                )
         return bp_code.to_code()
 
     def set_lineno(self, lineno):
@@ -225,18 +233,29 @@ class CodeGenerator(Atom):
             (bp.STORE_SUBSCR, None),                    # TOS
         )
 
-    def load_build_class(self):
-        """ Build a class from the top 3 stack items.
+    if sys.version_info < (3,):
 
-        """
-        self.code_ops.append(                           # TOS
-            (bp.LOAD_BUILD_CLASS, None),                # TOS -> builtins.__build_class__
-        )
+        def build_class(self):
+            """ Build a class from the top 3 stack items.
+
+            """
+            self.code_ops.append(                           # TOS -> name -> bases -> dict
+                (bp.BUILD_CLASS, None),                     # TOS -> class
+            )
+    else:
+        def load_build_class(self):
+            """ Build a class from the top 3 stack items.
+
+            """
+            self.code_ops.append(                           # TOS
+                (bp.LOAD_BUILD_CLASS, None),                # TOS -> builtins.__build_class__
+            )
 
     def make_function(self, n_defaults=0):
         """ Make a function from a code object on the TOS.
 
         """
+        # qual_name is absent under Python 2
         self.code_ops.append(                           # TOS -> qual_name -> code -> defaults
             (bp.MAKE_FUNCTION, n_defaults),             # TOS -> func
         )
