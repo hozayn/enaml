@@ -20,11 +20,12 @@ class Python3EnamlParser(BaseEnamlParser):
 
 
     """
+    parse_id = '3'
 
     lexer = Python3EnamlLexer
 
     def p_decl_funcdef3(self, p):
-        ''' decl_funcdef : NAME NAME parameters RIGHTARROW test COLON suite '''
+        ''' decl_funcdef : NAME NAME parameters RETURNARROW test COLON suite '''
         lineno = p.lineno(1)
         if p[1] != 'func':
             syntax_error('invalid syntax', FakeToken(p.lexer.lexer, lineno))
@@ -43,23 +44,16 @@ class Python3EnamlParser(BaseEnamlParser):
         decl_funcdef.is_override = False
         p[0] = decl_funcdef
 
-    def p_decl_funcdef2(self, p):
-        ''' decl_funcdef : NAME RIGHTARROW parameters RIGHTARROW test COLON suite '''
-        lineno = p.lineno(1)
-        funcdef = ast.FunctionDef()
-        funcdef.name = p[1]
-        funcdef.args = p[3]
-        funcdef.returns = p[5]
-        funcdef.body = p[7]
-        funcdef.decorator_list = []
-        funcdef.lineno = lineno
-        ast.fix_missing_locations(funcdef)
-        self._validate_decl_funcdef(funcdef, p.lexer.lexer)
-        decl_funcdef = enaml_ast.FuncDef()
-        decl_funcdef.lineno = lineno
-        decl_funcdef.funcdef = funcdef
-        decl_funcdef.is_override = True
-        p[0] = decl_funcdef
+    def p_small_stmt1(self, p):
+        ''' small_stmt : expr_stmt
+                       | del_stmt
+                       | pass_stmt
+                       | flow_stmt
+                       | import_stmt
+                       | global_stmt
+                       | assert_stmt
+                       | nonlocal_stmt'''
+        p[0] = p[1]
 
     def p_nonlocal_stmt1(self, p):
         ''' nonlocal_stmt : NONLOCAL NAME'''
@@ -174,11 +168,10 @@ def _make_typedarg_rule(func):
         return func(self, p)
 
     new_doc = func.__doc__.replace('fpdef', 'tfpdef')
-    new_doc.replace('varargslist', 'typedargslist')
-    rule.__doc__ = new_doc
+    rule.__doc__ = new_doc.replace('varargslist', 'typedargslist')
     return rule
 
 
 for f in filter(lambda x: 'varargslist' in x, dir(Python3EnamlParser)):
-    setattr(f.replace('varargslist', 'typedargslist'),
+    setattr(Python3EnamlParser, f.replace('varargslist', 'typedargslist'),
             _make_typedarg_rule(getattr(Python3EnamlParser, f)))

@@ -14,6 +14,8 @@ class Python3EnamlLexer(BaseEnamlLexer):
     """Lexer specialized for Python.
 
     """
+    operators = BaseEnamlLexer.operators + ((r'->', 'RETURNARROW'),)
+
     reserved = dict(list(BaseEnamlLexer.reserved.items()) +
                     [('nonlocal', 'NONLOCAL'),
                      ]
