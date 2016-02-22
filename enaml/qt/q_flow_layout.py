@@ -7,11 +7,13 @@
 #------------------------------------------------------------------------------
 from abc import ABCMeta, abstractmethod
 
+from future.utils import with_metaclass
+
 from .QtCore import Qt, QSize, QRect
 from .QtGui import QLayout, QWidgetItem
 
 
-class AbstractFlowWidget(object, metaclass=ABCMeta):
+class AbstractFlowWidget(with_metaclass(ABCMeta, object)):
     """ An abstract base class which defines the interface for widgets
     which can be used in a QFlowLayout.
 
