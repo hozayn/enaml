@@ -20,6 +20,8 @@ class Python2EnamlParser(BaseEnamlParser):
 
     """
 
+    parser_id = '2'
+
     lexer = Python2EnamlLexer
 
     def p_small_stmt1(self, p):
