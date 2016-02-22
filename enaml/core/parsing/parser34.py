@@ -7,6 +7,7 @@
 #------------------------------------------------------------------------------
 import ast
 
+from .lexer3 import Python34EnamlLexer
 from .parser3 import Python3EnamlParser
 
 
@@ -17,6 +18,10 @@ class Python34EnamlParser(Python3EnamlParser):
 
 
     """
+    parser_id = '34'
+
+    lexer = Python34EnamlLexer
+
     def p_atom11(self, p):
         ''' atom : NONE '''
         p[0] = ast.NameConstant(None)
@@ -34,6 +39,6 @@ class Python34EnamlParser(Python3EnamlParser):
         """Build an ast node for function arguments.
 
         """
-        return ast.Arguments(args=args, defaults=defaults, vararg=vararg,
+        return ast.arguments(args=args, defaults=defaults, vararg=vararg,
                              kwonlyargs=kwonlyargs, kw_defaults=kw_defaults,
                              kwarg=kwarg)
