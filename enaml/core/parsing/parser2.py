@@ -180,23 +180,6 @@ class Python2EnamlParser(BaseEnamlParser):
         ast.fix_missing_locations(classdef)
         p[0] = classdef
 
-    def _make_arg(self, arg, annotation=None, lineno=None):
-        """Build a argument node.
-
-        Parameters
-        ----------
-        arg : str
-            Name of the argument
-
-        annotation : ast.Node
-            Annotation (Python 3 only)
-
-        lineno :
-            Line number (Python 2 only)
-
-        """
-        return ast.Name(id=arg, ctx=ast.Param(), lineno=lineno)
-
     def _make_args(self, args, defaults=[], vararg=None, kwonlyargs=[],
                    kw_defaults=[], kwarg=None):
         """Build an ast node for function arguments.
@@ -220,6 +203,10 @@ class Python2EnamlParser(BaseEnamlParser):
 
         return ast.arguments(args=args, defaults=defaults, vararg=vararg,
                              kwarg=kwarg)
+
+    def p_fpdef1(self, p):
+        ''' fpdef : NAME '''
+        p[0] = ast.Name(id=p[1], ctx=ast.Param(), lineno=p.lineno(1))
 
     def p_fpdef2(self, p):
         ''' fpdef : LPAR fplist RPAR '''

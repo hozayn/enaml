@@ -3136,27 +3136,6 @@ class BaseEnamlParser(object):
         body = p[4]
         p[0] = ast.Lambda(args=args, body=body)
 
-    def _make_arg(self, arg, annotation=None, lineno=None):
-        """Build a argument node.
-
-        Parameters
-        ----------
-        arg : str
-            Name of the argument
-
-        annotation : ast.Node
-            Annotation (Python 3 only)
-
-        lineno :
-            Line number (Python 2 only)
-
-        """
-        raise NotImplementedError()
-#        if IS_PY3:
-#            return ast.arg(arg=arg, annotation=annotation)
-#        else:
-#            return ast.Name(id=arg, ctx=ast.Param(), lineno=lineno)
-
     def _make_args(self, args, defaults=[], vararg=None, kwonlyargs=[],
                    kw_defaults=[], kwarg=None):
         """Build an ast node for function arguments.
@@ -3379,10 +3358,6 @@ class BaseEnamlParser(object):
         args = list_args + [p[3]]
         defaults = list_defaults + [p[5]]
         p[0] = (args, defaults)
-
-    def p_fpdef1(self, p):
-        ''' fpdef : NAME '''
-        p[0] = self._make_arg(p[1])
 
     def p_error(self, t):
         msg = 'invalid syntax'

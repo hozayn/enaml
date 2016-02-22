@@ -116,23 +116,6 @@ class Python3EnamlParser(BaseEnamlParser):
 
     # XXXX support for ellipsis as expr
 
-    def _make_arg(self, arg, annotation=None, lineno=None):
-        """Build a argument node.
-
-        Parameters
-        ----------
-        arg : str
-            Name of the argument
-
-        annotation : ast.Node
-            Annotation (Python 3 only)
-
-        lineno :
-            Line number (Python 2 only)
-
-        """
-        return ast.arg(arg=arg, annotation=annotation)
-
     def _make_args(self, args, defaults=[], vararg=None, kwonlyargs=[],
                    kw_defaults=[], kwarg=None):
         """Build an ast node for function arguments.
@@ -151,13 +134,17 @@ class Python3EnamlParser(BaseEnamlParser):
 
     # XXXX add rules for kw only
 
+    def p_fpdef(self, p):
+        ''' fpdef : NAME '''
+        p[0] = ast.arg(arg=p[1], annotation=None)
+
     def p_tfpdef1(self, p):
         ''' tfpdef : NAME '''
-        p[0] = self._make_arg(p[1])
+        p[0] = ast.arg(arg=p[1], annotation=None)
 
     def p_tfpdef2(self, p):
         ''' tfpdef : NAME COLON test'''
-        p[0] = self._make_arg(p[1], annotations=p[3])
+        p[0] = ast.arg(arg=p[1], annotations=p[3])
 
 
 def _make_typedarg_rule(func):
