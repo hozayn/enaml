@@ -55,6 +55,16 @@ COMPILE_MODE = {
     PythonModule: 'exec',
 }
 
+#: Ast nodes associated with comprehensions which uses a function call that we
+#: will have to inline
+_COMP_NODES = [ast.ListComp] if IS_PY3 else []
+if hasattr(ast, 'DictComp'):
+    _COMP_NODES.append(ast.DictComp)
+if hasattr(ast, 'SetComp'):
+    _COMP_NODES.append(ast.SetComp)
+
+_COMP_NODES = tuple(_COMP_NODES)
+
 
 def unhandled_pragma(name, filename, lineno):
     """ Emit a warning for an unhandled pragma.
@@ -379,6 +389,116 @@ def safe_eval_ast(cg, node, name, lineno, local_names):
         cg.code_ops.extend(expr_cg.code_ops)
 
 
+def analyse_globals_and_comps(pyast):
+    """Collect the explicit 'global' variable names and check for the presence
+    of comprehensions (list, dict, set).
+
+    """
+    global_vars = set()
+    has_comp = False
+    for node in ast.walk(pyast):
+        if isinstance(node, ast.Global):
+            global_vars.update(node.names)
+        elif isinstance(node, _COMP_NODES):
+            has_comp = True
+
+    return global_vars, has_comp
+
+
+def rewrite_globals_access(code, global_vars):
+    """Update the function code global loads
+
+    This will rewrite the function to convert each LOAD_GLOBAL opcode
+    into a LOAD_NAME opcode, unless the associated name is known to have been
+    made global via the 'global' keyword.
+
+    """
+    inner_ops = code.code
+    for idx, (op, op_arg) in enumerate(inner_ops):
+        if op == bp.LOAD_GLOBAL and op_arg not in global_vars:
+            inner_ops[idx] = (bp.LOAD_NAME, op_arg)
+
+
+def _rewrite_comprehension(code):
+    """Rewrite the code associated with the function used in a comprehension
+    to make it inlineable.
+
+    Parameters
+    ----------
+    code :
+        Code of the function to inline
+
+    Returns
+    -------
+    creation_code : tuple
+        Op code used to create the iterable that will be filled by the
+        comprehension.
+
+    body : list[tuple]
+        List of operations filling the iterable should be placed right after
+        the GET_ITER op code.
+
+    """
+    # Start by discarding the first SetLineno and the RETURN_VALUE
+    ops = code.code[1:-1]
+
+    # Extract the construction operation and dicsard the LOAD_FAST used to
+    # access the iterable.
+    build_op = ops[0]
+    code.code = ops[2:]
+
+    inline_comprehensions(code)
+
+    return build_op, code.code
+
+
+def inline_comprehensions(code):
+    """Inline all list/dict/set comprehensions to avoid scoping issues.
+
+    Parameters
+    ----------
+    code :
+        Code object in which comprehension should be inlined.
+
+    globs : set
+        True global variables in the scope, the others used inside the
+        comprehensions will be rewritten to use LOAD_NAME and STORE_NAME
+
+    """
+    # New op codes generated for the code.
+    new_ops = []
+    # Stack of function definitions which will have to be inlined
+    func_stack = []
+    # Flag marking the last byte code was a GET_ITER and hence if we see a
+    # (CALL_FUNCTION, 1) it a comprehension that we should inline.
+    seen_GET_ITER = False
+    # Counter used to keep track of how many operations where seen since the
+    # last MAKE_FUNCTION to know where to insert the build_op returned by
+    # _rewrite_comprehension
+    counter = 0
+
+    # Scan all ops to detect function definitions and call after GET_ITER
+    for idx, (op, op_arg) in enumerate(code.code):
+        if op == bp.MAKE_FUNCTION:
+            func_stack.append(new_ops[-2][1])
+            del new_ops[-2:]
+            counter = 0
+        elif op == bp.GET_ITER:
+            seen_GET_ITER = True
+            new_ops.append((op, op_arg))
+        elif seen_GET_ITER and op == bp.CALL_FUNCTION and op_arg == 1:
+            build_op, inlined_ops = _rewrite_comprehension(func_stack.pop())
+            new_ops.insert(-counter-1, build_op)
+            new_ops.extend(inlined_ops)
+            seen_GET_ITER = False
+        else:
+            seen_GET_ITER = False
+            new_ops.append((op, op_arg))
+            counter += 1
+
+    code.code = new_ops
+
+
 def gen_child_def_node(cg, node, local_names):
     """ Generate the code to create the child def compiler node.
 
@@ -565,7 +685,7 @@ def gen_template_inst_binding(cg, node, index):
 
 
 def gen_operator_binding(cg, node, index, name):
-    """ Generate the code for a template inst binding.
+    """ Generate the code for an operator binding.
 
     The caller should ensure that F_GLOBALS and NODE_LIST are present
     in the fast locals of the code object.
@@ -586,7 +706,15 @@ def gen_operator_binding(cg, node, index, name):
 
     """
     mode = COMPILE_MODE[type(node.value)]
+    global_vars, has_comp = analyse_globals_and_comps(node.value.ast)
     code = compile(node.value.ast, cg.filename, mode=mode)
+
+    if has_comp:
+        b_code = bp.Code.from_code(code)
+        inline_comprehensions(b_code)
+        rewrite_globals_access(b_code, global_vars)
+        code = b_code.to_code()
+
     with cg.try_squash_raise():
         cg.set_lineno(node.lineno)
         load_helper(cg, 'run_operator')
@@ -677,11 +805,9 @@ def _insert_decl_function(cg, funcdef):
         The python FunctionDef ast node.
 
     """
-    # collect the explicit 'global' variable names
-    global_vars = set()
-    for node in ast.walk(funcdef):
-        if isinstance(node, ast.Global):
-            global_vars.update(node.names)
+    # collect the explicit 'global' variable names and check for the presence
+    # of comprehensions (list, dict, set).
+    global_vars, has_comp = analyse_globals_and_comps(funcdef)
 
     # generate the code object which will create the function
     mod = ast.Module(body=[funcdef])
@@ -698,16 +824,19 @@ def _insert_decl_function(cg, funcdef):
     #   MAKE_FUCTION    (num defaults)      // TOS
 
     # extract the inner code object which represents the actual
-    # function code and update its flags and global loads
+    # function code and update its flags
     if not IS_PY3:
-        inner = outer_ops[-2][1]  # Taken from original enaml code
+        inner = outer_ops[-2][1]  # On Python 2 there is no qualified name
     else:
-        inner = outer_ops[-3][1]  # Taken from @peterazmanov branch
+        inner = outer_ops[-3][1]  # On Python 3 a function has a qualified name
     inner.newlocals = False
-    inner_ops = inner.code
-    for idx, (op, op_arg) in enumerate(inner_ops):
-        if op == bp.LOAD_GLOBAL and op_arg not in global_vars:
-            inner_ops[idx] = (bp.LOAD_NAME, op_arg)
+
+    # On Python 3 all comprehensions use a function call (on Python 2 only dict
+    # and set). To avoid scoping issues the function call is inlined.
+    if has_comp:
+        inline_comprehensions(inner)
+
+    rewrite_globals_access(inner, global_vars)
 
     # inline the modified code ops into the code generator
     cg.code_ops.extend(outer_ops)
