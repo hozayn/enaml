@@ -419,6 +419,25 @@ def rewrite_globals_access(code, global_vars):
             inner_ops[idx] = (bp.LOAD_NAME, op_arg)
 
 
+def _ids():
+    """Generator producing unique ids.
+
+    """
+    i = 0
+    while True:
+        i += 1
+        yield i
+
+_ids = _ids()
+
+
+def new_name(name):
+    """Provide a unique name for a variable used in a comprehension.
+
+    """
+    return '_comprehension_var%s_%s' % (next(_ids), name)
+
+
 def _rewrite_comprehension(code):
     """Rewrite the code associated with the function used in a comprehension
     to make it inlineable.
@@ -446,6 +465,15 @@ def _rewrite_comprehension(code):
     # access the iterable.
     build_op = ops[0]
     code.code = ops[2:]
+
+    comp_locals = {}
+    for idx, (op, op_arg) in enumerate(code.code):
+        if op == bp.STORE_FAST:
+            if op_arg not in comp_locals:
+                comp_locals[op_arg] = new_name(op_arg)
+            code.code[idx] = (op, comp_locals[op_arg])
+        elif op == bp.LOAD_FAST and op_arg in comp_locals:
+            code.code[idx] = (op, comp_locals[op_arg])
 
     inline_comprehensions(code)
 
@@ -478,23 +506,32 @@ def inline_comprehensions(code):
     counter = 0
 
     # Scan all ops to detect function definitions and call after GET_ITER
-    for idx, (op, op_arg) in enumerate(code.code):
+    ops = enumerate(code.code)
+    for idx, (op, op_arg) in ops:
         if op == bp.MAKE_FUNCTION:
             func_stack.append(new_ops[-2][1])
             del new_ops[-2:]
             counter = 0
+        elif op == bp.LOAD_CLOSURE:
+            while True:
+                idx, (op, op_arg) = next(ops)
+                if op == bp.MAKE_CLOSURE:
+                    counter = 0
+                    break
+                elif op == bp.LOAD_CONST and isinstance(op_arg, bp.Code):
+                    func_stack.append(op_arg)
         elif op == bp.GET_ITER:
             seen_GET_ITER = True
             new_ops.append((op, op_arg))
+            continue
         elif seen_GET_ITER and op == bp.CALL_FUNCTION and op_arg == 1:
             build_op, inlined_ops = _rewrite_comprehension(func_stack.pop())
             new_ops.insert(-counter-1, build_op)
             new_ops.extend(inlined_ops)
-            seen_GET_ITER = False
         else:
-            seen_GET_ITER = False
             new_ops.append((op, op_arg))
             counter += 1
+        seen_GET_ITER = False
 
     code.code = new_ops
 
