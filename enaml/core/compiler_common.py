@@ -466,6 +466,7 @@ def _rewrite_comprehension(code):
     build_op = ops[0]
     code.code = ops[2:]
 
+    ops = []
     comp_locals = {}
     for idx, (op, op_arg) in enumerate(code.code):
         if op == bp.STORE_FAST:
@@ -474,7 +475,14 @@ def _rewrite_comprehension(code):
             code.code[idx] = (op, comp_locals[op_arg])
         elif op == bp.LOAD_FAST and op_arg in comp_locals:
             code.code[idx] = (op, comp_locals[op_arg])
+        # We suppress lineno inside comprehension as sometimes we get huge
+        # lineno increases which leads to negative increase at a later time.
+        # This fact was checked using dis so it is not a byteplay issue.
+        elif op == bp.SetLineno:
+            continue
+        ops.append((op, op_arg))
 
+    code.code = ops
     inline_comprehensions(code)
 
     return build_op, code.code
