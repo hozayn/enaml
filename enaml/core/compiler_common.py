@@ -513,12 +513,14 @@ def inline_comprehensions(code):
     # _rewrite_comprehension
     counter = 0
 
+    offset = 2 if IS_PY3 else 1  # where to find the code of a function
+
     # Scan all ops to detect function definitions and call after GET_ITER
     ops = enumerate(code.code)
     for idx, (op, op_arg) in ops:
         if op == bp.MAKE_FUNCTION:
-            func_stack.append(new_ops[-2][1])
-            del new_ops[-2:]
+            func_stack.append(new_ops[-offset][1])
+            del new_ops[-offset:]
             counter = 0
         elif op == bp.LOAD_CLOSURE:
             while True:
