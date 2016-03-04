@@ -281,9 +281,9 @@ class Code(object):
             # Flags unsupported in earlier versions
             assert force_coroutine is None and force_iterable_coroutine is None and future_generator_stop is None
         else:
-            self.force_coroutine = force_coroutine
-            self.force_iterable_coroutine = force_iterable_coroutine
-            self.future_generator_stop = future_generator_stop
+            self.force_coroutine = bool(force_coroutine)
+            self.force_iterable_coroutine = bool(force_iterable_coroutine)
+            self.future_generator_stop = bool(future_generator_stop)
 
     @staticmethod
     def _findlinestarts(code):

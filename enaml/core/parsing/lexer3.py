@@ -60,9 +60,9 @@ class Python35EnamlLexer(Python34EnamlLexer):
 
     lex_id = '35'
 
-    operators = Python3EnamlLexer.operators + (r'@=', 'ATEQUAL')
+    operators = Python34EnamlLexer.operators + ((r'@=', 'ATEQUAL'),)
 
-    reserved = dict(list(Python3EnamlLexer.reserved.items()) +
+    reserved = dict(list(Python34EnamlLexer.reserved.items()) +
                     [('async', 'ASYNC'),
                      ('await', 'AWAIT'),
                      ]

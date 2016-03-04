@@ -9,7 +9,6 @@
 
 """
 import ast
-import sys
 
 from atom.api import Str, Typed
 
@@ -600,7 +599,7 @@ def gen_child_def_node(cg, node, local_names):
 
             class_cg.code_ops.append((bp.LOAD_NAME, '__name__'),)
             class_cg.code_ops.append((bp.STORE_NAME, '__module__'),)
-            class_cg.load_const(node.typename) # ?
+            class_cg.load_const(node.typename)
             class_cg.code_ops.append((bp.STORE_NAME, '__qualname__'),)
             class_cg.load_const(None)
             class_cg.return_value()
