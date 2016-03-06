@@ -6,6 +6,7 @@
 # The full license is in the file COPYING.txt, distributed with this software.
 #------------------------------------------------------------------------------
 import ast
+from types import FunctionType
 
 from .. import enaml_ast
 from .base_lexer import syntax_error
@@ -373,18 +374,19 @@ class Python3EnamlParser(BaseEnamlParser):
         p[0] = ast.arg(arg=p[1], annotations=p[3])
 
 
-def _make_typedarg_rule(func):
+def _make_typedarg_rule(f, name):
     """Copy a rule and allow for annotations.
 
     """
-    def rule(self, p):
-        return func(self, p)
+    rule = FunctionType(f.__code__, f.__globals__, name,
+                        f.__defaults__, f.__closure__)
 
-    new_doc = func.__doc__.replace('fpdef', 'tfpdef')
+    new_doc = f.__doc__.replace('fpdef', 'tfpdef')
     rule.__doc__ = new_doc.replace('varargslist', 'typedargslist')
     return rule
 
 
 for f in filter(lambda x: 'varargslist' in x, dir(Python3EnamlParser)):
-    setattr(Python3EnamlParser, f.replace('varargslist', 'typedargslist'),
-            _make_typedarg_rule(getattr(Python3EnamlParser, f)))
+    name = f.replace('varargslist', 'typedargslist')
+    setattr(Python3EnamlParser, name,
+            _make_typedarg_rule(getattr(Python3EnamlParser, f), name))
