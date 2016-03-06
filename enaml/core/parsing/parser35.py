@@ -8,6 +8,7 @@
 import ast
 
 from .lexer3 import Python35EnamlLexer
+from .base_parser import Load
 from .parser34 import Python34EnamlParser
 
 
@@ -32,6 +33,30 @@ class Python35EnamlParser(Python34EnamlParser):
     _DECL_FUNCDEF_DISALLOWED =\
         dict(list(Python34EnamlParser._DECL_FUNCDEF_DISALLOWED.items()) +
              [(ast.AsyncFunctionDef, 'async function definition')])
+
+    def set_call_arguments(self, node, args):
+        """Set the arguments for an ast.Call node.
+
+        On Python 3.5+, the starargs and kwargs attributes does not exists
+        anymore.
+
+        Parameters
+        ----------
+        node : ast.Call
+            Node was arguments should be set.
+
+        args : Arguments
+            Arguments for the function call.
+
+        """
+        pos_args = args.args
+        if args.starargs:
+            pos_args += [ast.Starred(value=args.starargs, ctx=Load)]
+        key_args = args.keywords
+        if args.kwargs:
+            key_args += [ast.keyword(arg=None, value=args.kwargs)]
+        node.args = pos_args
+        node.keywords = key_args
 
     def p_augassign(self, p):
         ''' augassign : AMPEREQUAL

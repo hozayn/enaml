@@ -142,7 +142,7 @@ class BaseEnamlParser(object):
 
     """
     # An id used to generate different parse table files per parser
-    parse_id = ''
+    parser_id = ''
 
     # low to high
     precedence = tuple()
@@ -207,7 +207,7 @@ class BaseEnamlParser(object):
         self.tokens = self.lexer().tokens
         # Get a save directory for the lex and parse tables
         parse_dir = os.path.join(os.path.dirname(__file__), 'parse_tab')
-        parse_mod = 'enaml.core.parsing.parse_tab.parsetab%s' % self.parse_id
+        parse_mod = 'enaml.core.parsing.parse_tab.parsetab%s' % self.parser_id
         self.parser = yacc.yacc(
             method='LALR',
             module=self,
@@ -263,6 +263,23 @@ class BaseEnamlParser(object):
         if items is not None:
             for item in items:
                 self.set_context(item, ctx, p)
+
+    def set_call_arguments(self, node, args):
+        """Set the arguments for an ast.Call node.
+
+        Parameters
+        ----------
+        node : ast.Call
+            Node was arguments should be set.
+
+        args : Arguments
+            Arguments for the function call.
+
+        """
+        node.args = args.args
+        node.keywords = args.keywords
+        node.starargs = args.starargs
+        node.kwargs = args.kwargs
 
     # =========================================================================
     # Begin Parsing Rules
@@ -780,6 +797,8 @@ class BaseEnamlParser(object):
         funcdef = ast.FunctionDef()
         funcdef.name = p[2]
         funcdef.args = p[3]
+        if IS_PY3:
+            funcdef.returns = None
         funcdef.body = p[5]
         funcdef.decorator_list = []
         funcdef.lineno = lineno
@@ -797,6 +816,8 @@ class BaseEnamlParser(object):
         funcdef = ast.FunctionDef()
         funcdef.name = p[1]
         funcdef.args = p[3]
+        if IS_PY3:
+            funcdef.returns = None
         funcdef.body = p[5]
         funcdef.decorator_list = []
         funcdef.lineno = lineno
@@ -1892,6 +1913,8 @@ class BaseEnamlParser(object):
         funcdef = ast.FunctionDef()
         funcdef.name = p[2]
         funcdef.args = p[3]
+        if IS_PY3:
+            funcdef.returns = None
         funcdef.body = p[5]
         funcdef.decorator_list = []
         funcdef.lineno = p.lineno(1)
@@ -1955,10 +1978,7 @@ class BaseEnamlParser(object):
         ''' decorator : AT dotted_name LPAR RPAR NEWLINE '''
         call = ast.Call()
         call.func = ast_for_dotted_name(p[2])
-        call.args = []
-        call.keywords = []
-        call.stargs = None
-        call.kwargs = None
+        self.set_call_arguments(call, Arguments())
         call.lineno = p.lineno(1)
         ast.fix_missing_locations(call)
         p[0] = call
@@ -1968,10 +1988,7 @@ class BaseEnamlParser(object):
         args = p[4]
         call = ast.Call()
         call.func = ast_for_dotted_name(p[2])
-        call.args = args.args
-        call.keywords = args.keywords
-        call.starargs = args.starargs
-        call.kwargs = args.kwargs
+        self.set_call_arguments(call, args)
         call.lineno = p.lineno(1)
         ast.fix_missing_locations(call)
         p[0] = call
@@ -2627,8 +2644,9 @@ class BaseEnamlParser(object):
     def p_trailer2(self, p):
         ''' trailer : LPAR arglist RPAR '''
         args = p[2]
-        p[0] = ast.Call(args=args.args, keywords=args.keywords,
-                        starargs=args.starargs, kwargs=args.kwargs)
+        call = ast.Call()
+        self.set_call_arguments(call, args)
+        p[0] = call
 
     def p_trailer3(self, p):
         ''' trailer : LSQB subscriptlist RSQB '''

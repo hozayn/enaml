@@ -23,7 +23,7 @@ class Python3EnamlParser(BaseEnamlParser):
 
 
     """
-    parse_id = '3'
+    parser_id = '3'
 
     lexer = Python3EnamlLexer
 

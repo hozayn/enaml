@@ -26,6 +26,7 @@ else:
         from .parser35 import Python35EnamlParser
         _parser = Python35EnamlParser()
 
+
 def parse(enaml_source, filename='Enaml'):
     # All errors in the parsing and lexing rules are raised as a custom
     # ParsingError. This exception object can be called to return the
