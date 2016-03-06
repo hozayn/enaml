@@ -12,8 +12,6 @@ from .base_lexer import syntax_error
 from .base_parser import BaseEnamlParser, FakeToken, ast_for_testlist, Load
 from .lexer3 import Python3EnamlLexer
 
-# TODO support advanced unpacking
-
 
 class Python3EnamlParser(BaseEnamlParser):
     """Enaml parser supporting Python syntax.
