@@ -13,7 +13,6 @@ from .base_parser import BaseEnamlParser, FakeToken, ast_for_testlist
 from .lexer3 import Python3EnamlLexer
 
 # TODO support advanced unpacking
-# TODO support kwarg only in functions
 
 
 class Python3EnamlParser(BaseEnamlParser):
@@ -117,7 +116,9 @@ class Python3EnamlParser(BaseEnamlParser):
         ast.fix_missing_locations(classdef)
         p[0] = classdef
 
-    # XXXX support for ellipsis as expr
+    def p_atom11(self, p):
+        ''' atom : ELLIPSIS '''
+        p[0] = ast.Ellipsis()
 
     def _make_args(self, args, defaults=[], vararg=None, kwonlyargs=[],
                    kw_defaults=[], kwarg=None):
@@ -135,7 +136,210 @@ class Python3EnamlParser(BaseEnamlParser):
                              kw_defaults=kw_defaults, kwarg=kwarg,
                              kwargannotation=ka)
 
-    # XXXX add rules for kw only
+    def p_varargslist24(self, p):
+        ''' varargslist : fpdef COMMA STAR fpdef kwargslist_list'''
+        # def f(a, *args, e, b=1): pass
+        klist_args, kdefaults = p[5]
+        p[0] = self._make_args([p[1]], vararg=p[4], kwonlyargs=klist_args,
+                               kw_defaults=kdefaults)
+
+    def p_varargslist25(self, p):
+        ''' varargslist : fpdef COMMA STAR kwargslist_list'''
+        # def f(a, *, e, b=1): pass
+        klist_args, kdefaults = p[4]
+        p[0] = self._make_args([p[1]], kwonlyargs=klist_args,
+                               kw_defaults=kdefaults)
+
+    def p_varargslist26(self, p):
+        ''' varargslist : fpdef COMMA STAR fpdef kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a, *args, e, b=1, **kwargs): pass
+        klist_args, kdefaults = p[5]
+        p[0] = self._make_args([p[1]], vararg=p[4], kwonlyargs=klist_args,
+                               kw_defaults=kdefaults, kwargs=p[8])
+
+    def p_varargslist27(self, p):
+        ''' varargslist : fpdef COMMA STAR kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a, *, e, b=1, **kwargs): pass
+        klist_args, kdefaults = p[4]
+        p[0] = self._make_args([p[1]], kwonlyargs=klist_args,
+                               kw_defaults=kdefaults,  kwargs=p[7])
+
+    def p_varargslist28(self, p):
+        ''' varargslist : fpdef varargslist_list COMMA STAR fpdef kwargslist_list '''
+        # def f(a, c, d=4, *args, e, b=1): pass
+        list_args, defaults = p[2]
+        args = [p[1]] + list_args
+        klist_args, kdefaults = p[6]
+        p[0] = self._make_args(args=args, defaults=defaults, vararg=p[5],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist29(self, p):
+        ''' varargslist : fpdef varargslist_list COMMA STAR kwargslist_list '''
+        # def f(a, c, d=4, *args, e, b=1): pass
+        list_args, defaults = p[2]
+        args = [p[1]] + list_args
+        klist_args, kdefaults = p[5]
+        p[0] = self._make_args(args=args, defaults=defaults,
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist30(self, p):
+        ''' varargslist : fpdef varargslist_list COMMA STAR fpdef kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a, c, *args, e, b=1, **kwargs): pass
+        list_args, defaults = p[2]
+        args = [p[1]] + list_args
+        klist_args, kdefaults = p[6]
+        p[0] = self._make_args(args=args, defaults=defaults, vararg=p[5],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults,
+                               kwarg=p[9])
+
+    def p_varargslist31(self, p):
+        ''' varargslist : fpdef varargslist_list COMMA STAR kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a, c, *, e, b=1, **kwargs): pass
+        list_args, defaults = p[2]
+        args = [p[1]] + list_args
+        klist_args, kdefaults = p[5]
+        p[0] = self._make_args(args=args, defaults=defaults,
+                               kwonlyargs=klist_args, kw_defaults=kdefaults,
+                               kwarg=p[8])
+
+    def p_varargslist32(self, p):
+        ''' varargslist : fpdef EQUAL test COMMA STAR fpdef kwargslist_list'''
+        # def f(a=1, *args, e, b=1): pass
+        klist_args, kdefaults = p[7]
+        p[0] = self._make_args([p[1]], defaults=[p[3]], vararg=p[6],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist33(self, p):
+        ''' varargslist : fpdef EQUAL test COMMA STAR kwargslist_list'''
+        # def f(a=1, *args, e, b=1): pass
+        klist_args, kdefaults = p[6]
+        p[0] = self._make_args([p[1]], defaults=[p[3]],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist34(self, p):
+        ''' varargslist : fpdef EQUAL test COMMA STAR fpdef kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a=1, *args, e, b=1, **kwargs): pass
+        klist_args, kdefaults = p[7]
+        p[0] = self._make_args([p[1]], defaults=[p[3]], vararg=p[6],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults,
+                               kwarg=p[10])
+
+    def p_varargslist35(self, p):
+        ''' varargslist : fpdef EQUAL test COMMA STAR kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a=1, *, e, b=1, **kwargs): pass
+        klist_args, kdefaults = p[6]
+        p[0] = self._make_args([p[1]], defaults=[p[3]],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults,
+                               kwarg=p[9])
+
+    def p_varargslist36(self, p):
+        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR fpdef kwargslist_list'''
+        # def f(a=1, b=2, *args, e, b=1): pass
+        list_args, list_defaults = p[4]
+        if len(list_args) != len(list_defaults):
+            msg = 'non-default argument follows default argument.'
+            tok = FakeToken(p.lexer.lexer, p.lineno(2))
+            syntax_error(msg, tok)
+        klist_args, kdefaults = p[8]
+        args = [p[1]] + list_args
+        defaults = [p[3]] + list_defaults
+        p[0] = self._make_args(args, defaults=defaults, vararg=p[7],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist37(self, p):
+        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR kwargslist_list'''
+        # def f(a=1, b=2, *, e, b=1): pass
+        list_args, list_defaults = p[4]
+        if len(list_args) != len(list_defaults):
+            msg = 'non-default argument follows default argument.'
+            tok = FakeToken(p.lexer.lexer, p.lineno(2))
+            syntax_error(msg, tok)
+        klist_args, kdefaults = p[7]
+        args = [p[1]] + list_args
+        defaults = [p[3]] + list_defaults
+        p[0] = self._make_args(args, defaults=defaults,
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist38(self, p):
+        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR fpdef kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a=1, b=2, *args, e, b=1, **kwargs)
+        list_args, list_defaults = p[4]
+        if len(list_args) != len(list_defaults):
+            msg = 'non-default argument follows default argument.'
+            tok = FakeToken(p.lexer.lexer, p.lineno(2))
+            syntax_error(msg, tok)
+        klist_args, kdefaults = p[8]
+        args = [p[1]] + list_args
+        defaults = [p[3]] + list_defaults
+        p[0] = self._make_args(args, defaults=defaults, vararg=p[7],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults,
+                               kwarg=p[10])
+
+    def p_varargslist39(self, p):
+        ''' varargslist : fpdef EQUAL test varargslist_list COMMA STAR kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(a=1, b=2, *, e, b=1, **kwargs)
+        list_args, list_defaults = p[4]
+        if len(list_args) != len(list_defaults):
+            msg = 'non-default argument follows default argument.'
+            tok = FakeToken(p.lexer.lexer, p.lineno(2))
+            syntax_error(msg, tok)
+        klist_args, kdefaults = p[7]
+        args = [p[1]] + list_args
+        defaults = [p[3]] + list_defaults
+        p[0] = self._make_args(args, defaults=defaults,
+                               kwonlyargs=klist_args, kw_defaults=kdefaults,
+                               kwarg=p[9])
+
+    def p_varargslist40(self, p):
+        ''' varargslist : STAR fpdef kwargslist_list '''
+        # def f(*args, e, b=1): pass
+        klist_args, kdefaults = p[3]
+        p[0] = self._make_args([], vararg=p[2],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist41(self, p):
+        ''' varargslist : STAR kwargslist_list '''
+        # def f(*, e, b=1): pass
+        klist_args, kdefaults = p[2]
+        p[0] = self._make_args([], kwonlyargs=klist_args,
+                               kw_defaults=kdefaults)
+
+    def p_varargslist42(self, p):
+        ''' varargslist : STAR fpdef kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(*args, **kwargs): pass
+        klist_args, kdefaults = p[3]
+        p[0] = self._make_args(args=[], vararg=p[2], kwarg=p[6],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    def p_varargslist43(self, p):
+        ''' varargslist : STAR kwargslist_list COMMA DOUBLESTAR fpdef '''
+        # def f(*args, **kwargs): pass
+        klist_args, kdefaults = p[2]
+        p[0] = self._make_args(args=[], kwarg=p[5],
+                               kwonlyargs=klist_args, kw_defaults=kdefaults)
+
+    # The kwargslist_list handlers return a 2-tuple of (args, defaults) lists
+    def p_kwargslist_list1(self, p):
+        ''' kwargslist_list : COMMA fpdef '''
+        p[0] = ([p[2]], [None])
+
+    def p_kwargslist_list2(self, p):
+        ''' kwargslist_list : COMMA fpdef EQUAL test '''
+        p[0] = ([p[2]], [p[4]])
+
+    def p_kwargslist_list3(self, p):
+        ''' kwargslist_list : kwargslist_list COMMA fpdef '''
+        list_args, list_defaults = p[1]
+        args = list_args + [p[3]]
+        defaults = list_defaults + [None]
+        p[0] = (args, defaults)
+
+    def p_kwargslist_list4(self, p):
+        ''' kwargslist_list : kwargslist_list COMMA fpdef EQUAL test '''
+        list_args, list_defaults = p[1]
+        args = list_args + [p[3]]
+        defaults = list_defaults + [p[5]]
+        p[0] = (args, defaults)
 
     def p_fpdef(self, p):
         ''' fpdef : NAME '''
