@@ -1507,14 +1507,14 @@ class BaseEnamlParser(object):
         p[0] = assert_stmt
 
     def p_expr_stmt1(self, p):
-        ''' expr_stmt : testlist '''
+        ''' expr_stmt : testlist_star_expr '''
         expr = ast.Expr()
         expr.value = ast_for_testlist(p[1])
         p[0] = expr
 
     def p_expr_stmt2(self, p):
-        ''' expr_stmt : testlist augassign testlist
-                      | testlist augassign yield_expr '''
+        ''' expr_stmt : testlist_star_expr augassign testlist
+                      | testlist_star_expr augassign yield_expr '''
         op, lineno = p[2]
         lhs = ast_for_testlist(p[1])
         rhs = ast_for_testlist(p[3])
@@ -1529,7 +1529,7 @@ class BaseEnamlParser(object):
         p[0] = aug
 
     def p_expr_stmt3(self, p):
-        ''' expr_stmt : testlist equal_list '''
+        ''' expr_stmt : testlist_star_expr equal_list '''
         all_items = [p[1]] + p[2]
         targets = list(map(ast_for_testlist, all_items))
         value = targets.pop()
@@ -1561,12 +1561,12 @@ class BaseEnamlParser(object):
         p[0] = (op, lineno)
 
     def p_equal_list1(self, p):
-        ''' equal_list : EQUAL testlist
+        ''' equal_list : EQUAL testlist_star_expr
                        | EQUAL yield_expr '''
         p[0] = [p[2]]
 
     def p_equal_list2(self, p):
-        ''' equal_list : EQUAL testlist equal_list
+        ''' equal_list : EQUAL testlist_star_expr equal_list
                        | EQUAL yield_expr equal_list '''
         p[0] = [p[2]] + p[3]
 
@@ -1592,6 +1592,42 @@ class BaseEnamlParser(object):
 
     def p_testlist_list2(self, p):
         ''' testlist_list : testlist_list COMMA test '''
+        p[0] = p[1] + [p[3]]
+
+    # Star expr does not exist before Python 3 but to avoid redefining many
+    # rules we take it into account here and add the star_expr rule only under
+    # Python 3
+    def p_test_or_star1(self, p):
+        ''' test_or_star : test '''
+        p[0] = p[1]
+
+    # Under Python 3.5 star expr can occur in new places
+    def p_test_or_star_new1(self, p):
+        ''' test_or_star_new : test '''
+        p[0] = p[1]
+
+    def p_testlist_star_expr1(self, p):
+        ''' testlist_star_expr : test_or_star '''
+        p[0] = p[1]
+
+    def p_test_list_star_expr2(self, p):
+        ''' testlist_star_expr : test_or_star COMMA '''
+        p[0] = [p[1]]
+
+    def p_test_list_star_expr3(self, p):
+        ''' testlist_star_expr : test_or_star testlist_star_expr_list '''
+        p[0] = [p[1]] + p[2]
+
+    def p_test_list_star_expr4(self, p):
+        ''' testlist_star_expr : test_or_star testlist_star_expr_list COMMA '''
+        p[0] = [p[1]] + p[2]
+
+    def p_test_list_star_expr_list1(self, p):
+        ''' testlist_star_expr_list : COMMA test_or_star '''
+        p[0] = [p[2]]
+
+    def p_test_list_star_expr_list2(self, p):
+        ''' testlist_star_expr_list : testlist_star_expr_list COMMA test_or_star '''
         p[0] = p[1] + [p[3]]
 
     def p_compound_stmt(self, p):
@@ -2517,14 +2553,14 @@ class BaseEnamlParser(object):
         p[0] = ast.List(elts=[], ctx=Load)
 
     def p_atom5(self, p):
-        ''' atom : LSQB listmaker RSQB '''
+        ''' atom : LSQB testlist_comp RSQB '''
         info = p[2]
         if isinstance(info, CommaSeparatedList):
             node = ast.List(elts=info.values, ctx=Load)
         elif isinstance(info, GeneratorInfo):
             node = ast.ListComp(elt=info.elt, generators=info.generators)
         else:
-            raise TypeError('Unexpected node for listmaker: %s' % info)
+            node = ast.List(elts=[info], ctx=Load)
         p[0] = node
 
     def p_atom6(self, p):
@@ -2577,64 +2613,34 @@ class BaseEnamlParser(object):
     # use repr(...). This simplifies the grammar since we don't have
     # to define a testlist1.
 
-    def p_listmaker1(self, p):
-        ''' listmaker : test list_for '''
-        p[0] = GeneratorInfo(elt=p[1], generators=p[2])
-
-    def p_listmaker2(self, p):
-        ''' listmaker : test '''
-        p[0] = CommaSeparatedList(values=[p[1]])
-
-    def p_listmaker3(self, p):
-        ''' listmaker : test COMMA '''
-        p[0] = CommaSeparatedList(values=[p[1]])
-
-    def p_listmaker4(self, p):
-        ''' listmaker : test listmaker_list '''
-        values = [p[1]] + p[2]
-        p[0] = CommaSeparatedList(values=values)
-
-    def p_listmaker5(self, p):
-        ''' listmaker : test listmaker_list COMMA '''
-        values = [p[1]] + p[2]
-        p[0] = CommaSeparatedList(values=values)
-
-    def p_listmaker_list1(self, p):
-        ''' listmaker_list : COMMA test '''
-        p[0] = [p[2]]
-
-    def p_listmaker_list2(self, p):
-        ''' listmaker_list : listmaker_list COMMA test '''
-        p[0] = p[1] + [p[3]]
-
     def p_testlist_comp1(self, p):
-        ''' testlist_comp : test comp_for '''
+        ''' testlist_comp : test_or_star comp_for '''
         p[0] = GeneratorInfo(elt=p[1], generators=p[2])
 
     def p_testlist_comp2(self, p):
-        ''' testlist_comp : test '''
+        ''' testlist_comp : test_or_star '''
         p[0] = p[1]
 
     def p_testlist_comp3(self, p):
-        ''' testlist_comp : test COMMA '''
+        ''' testlist_comp : test_or_star COMMA '''
         p[0] = CommaSeparatedList(values=[p[1]])
 
     def p_testlist_comp4(self, p):
-        ''' testlist_comp : test testlist_comp_list '''
+        ''' testlist_comp : test_or_star testlist_comp_list '''
         values = [p[1]] + p[2]
         p[0] = CommaSeparatedList(values=values)
 
     def p_testlist_comp5(self, p):
-        ''' testlist_comp : test testlist_comp_list COMMA '''
+        ''' testlist_comp : test_or_star testlist_comp_list COMMA '''
         values = [p[1]] + p[2]
         p[0] = CommaSeparatedList(values=values)
 
     def p_testlist_comp_list1(self, p):
-        ''' testlist_comp_list : COMMA test '''
+        ''' testlist_comp_list : COMMA test_or_star '''
         p[0] = [p[2]]
 
     def p_testlist_comp_list2(self, p):
-        ''' testlist_comp_list : testlist_comp_list COMMA test '''
+        ''' testlist_comp_list : testlist_comp_list COMMA test_or_star '''
         p[0] = p[1] + [p[3]]
 
     def p_trailer1(self, p):
@@ -2774,55 +2780,58 @@ class BaseEnamlParser(object):
         p[0] = p[1] + [p[3]]
 
     def p_dictorsetmaker1(self, p):
-        ''' dictorsetmaker : test COLON test comp_for '''
-        p[0] = GeneratorInfo(elt=(p[1], p[3]), generators=p[4])
+        ''' dictorsetmaker : dosm_colon comp_for '''
+        p[0] = GeneratorInfo(elt=p[1], generators=p[2])
 
     def p_dictorsetmaker2(self, p):
-        ''' dictorsetmaker : test COLON test '''
-        values = [(p[1], p[3])]
+        ''' dictorsetmaker : dosm_colon '''
+        values = [p[1]]
         p[0] = CommaSeparatedList(values=values)
 
     def p_dictorsetmaker3(self, p):
-        ''' dictorsetmaker : test COLON test COMMA '''
-        values = [(p[1], p[3])]
-        p[0] = CommaSeparatedList(values=values)
+        ''' dictorsetmaker : dosm_colon COMMA '''
+        p[0] = CommaSeparatedList(values=[p[1]])
 
     def p_dictorsetmaker4(self, p):
-        ''' dictorsetmaker : test COLON test dosm_colon_list '''
-        values = [(p[1], p[3])] + p[4]
+        ''' dictorsetmaker : dosm_colon dosm_colon_list '''
+        values = [p[1]] + p[2]
         p[0] = CommaSeparatedList(values=values)
 
     def p_dictorsetmaker5(self, p):
-        ''' dictorsetmaker : test COLON test dosm_colon_list COMMA '''
-        values = [(p[1], p[3])] + p[4]
+        ''' dictorsetmaker : dosm_colon dosm_colon_list COMMA '''
+        values = [p[1]] + p[2]
         p[0] = CommaSeparatedList(values=values)
 
     def p_dictorsetmaker6(self, p):
-        ''' dictorsetmaker : test comp_for '''
+        ''' dictorsetmaker : test_or_star_new comp_for '''
         p[0] = GeneratorInfo(elt=p[1], generators=p[2])
 
     def p_dictorsetmaker7(self, p):
-        ''' dictorsetmaker : test COMMA '''
+        ''' dictorsetmaker : test_or_star_new COMMA '''
         values = [p[1]]
         p[0] = CommaSeparatedList(values=values)
 
     def p_dictorsetmaker8(self, p):
-        ''' dictorsetmaker : test dosm_comma_list '''
+        ''' dictorsetmaker : test_or_star_new dosm_comma_list '''
         values = [p[1]] + p[2]
         p[0] = CommaSeparatedList(values=values)
 
     def p_dictorsetmaker9(self, p):
-        ''' dictorsetmaker : test dosm_comma_list COMMA '''
+        ''' dictorsetmaker : test_or_star_new dosm_comma_list COMMA '''
         values = [p[1]] + p[2]
         p[0] = CommaSeparatedList(values=values)
 
+    def p_dosm_colon1(self, p):
+        ''' dosm_colon : test COLON test '''
+        p[0] = (p[1], p[3])
+
     def p_dosm_colon_list1(self, p):
-        ''' dosm_colon_list : COMMA test COLON test '''
-        p[0] = [(p[2], p[4])]
+        ''' dosm_colon_list : COMMA dosm_colon '''
+        p[0] = [p[2]]
 
     def p_dosm_colon_list2(self, p):
-        ''' dosm_colon_list : dosm_colon_list COMMA test COLON test '''
-        p[0] = p[1] + [(p[3], p[5])]
+        ''' dosm_colon_list : dosm_colon_list COMMA dosm_colon '''
+        p[0] = p[1] + [p[3]]
 
     def p_dosm_comma_list1(self, p):
         ''' dosm_comma_list : COMMA test '''
@@ -3029,41 +3038,6 @@ class BaseEnamlParser(object):
             syntax_error(msg, tok)
         value = p[3]
         p[0] = ast.keyword(arg=arg.id, value=value, lineno=p.lineno(2))
-
-    def p_list_for1(self, p):
-        ''' list_for : FOR exprlist IN testlist_safe '''
-        target = p[2]
-        self.set_context(target, Store, p)
-        p[0] = [ast.comprehension(target=target, iter=p[4], ifs=[])]
-
-    def p_list_for2(self, p):
-        ''' list_for : FOR exprlist IN testlist_safe list_iter '''
-        target = p[2]
-        self.set_context(target, Store, p)
-        gens = []
-        gens.append(ast.comprehension(target=target, iter=p[4], ifs=[]))
-        for item in p[5]:
-            if isinstance(item, ast.comprehension):
-                gens.append(item)
-            else:
-                gens[-1].ifs.append(item)
-        p[0] = gens
-
-    def p_list_iter1(self, p):
-        ''' list_iter : list_for '''
-        p[0] = p[1]
-
-    def p_list_iter2(self, p):
-        ''' list_iter : list_if '''
-        p[0] = p[1]
-
-    def p_list_if1(self, p):
-        ''' list_if : IF old_test '''
-        p[0] = [p[2]]
-
-    def p_list_if2(self, p):
-        ''' list_if : IF old_test list_iter '''
-        p[0] = [p[2]] + p[3]
 
     def p_comp_for1(self, p):
         ''' comp_for : FOR exprlist IN or_test '''

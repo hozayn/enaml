@@ -58,6 +58,10 @@ class Python35EnamlParser(Python34EnamlParser):
         node.args = pos_args
         node.keywords = key_args
 
+    def p_test_or_star_new2(self, p):
+        ''' test_or_star_new : star_expr '''
+        p[0] = p[1]
+
     def p_augassign(self, p):
         ''' augassign : AMPEREQUAL
                       | CIRCUMFLEXEQUAL
@@ -73,6 +77,10 @@ class Python35EnamlParser(Python34EnamlParser):
                       | VBAREQUAL
                       | ATEQUAL '''
         super(Python35EnamlParser, self).p_augassign(p)
+
+    def p_dosm_colon(self, p):
+        ''' dosm_colon : DOUBLESTAR expr '''
+        p[0] = (None, p[2])
 
 #    def p_compound_stmt(self, p):
 #        ''' compound_stmt : if_stmt

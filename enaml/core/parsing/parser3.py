@@ -9,7 +9,7 @@ import ast
 
 from .. import enaml_ast
 from .base_lexer import syntax_error
-from .base_parser import BaseEnamlParser, FakeToken, ast_for_testlist
+from .base_parser import BaseEnamlParser, FakeToken, ast_for_testlist, Load
 from .lexer3 import Python3EnamlLexer
 
 # TODO support advanced unpacking
@@ -25,6 +25,18 @@ class Python3EnamlParser(BaseEnamlParser):
     parser_id = '3'
 
     lexer = Python3EnamlLexer
+
+    context_allowed = set(list(BaseEnamlParser.context_allowed) +
+                          [ast.Starred])
+
+    def set_context(self, node, ctx, p):
+        """Properly set the context of ast.Starred.
+
+        """
+        super(Python3EnamlParser, self).set_context(node, ctx, p)
+        if( isinstance(node, ast.Starred) and
+                type(node.value) in self.context_allowed):
+            self.set_context(node.value, ctx, p)
 
     def p_decl_funcdef3(self, p):
         ''' decl_funcdef : NAME NAME parameters RETURNARROW test COLON suite '''
@@ -77,6 +89,15 @@ class Python3EnamlParser(BaseEnamlParser):
         raise_stmt.type = p[1]
         raise_stmt.cause = p[4]
         p[0] = raise_stmt
+
+    def p_test_or_star2(self, p):
+        ''' test_or_star : star_expr '''
+        p[0] = p[1]
+
+    def p_star_expr(self, p):
+        ''' star_expr : STAR expr '''
+        # We can assume Load as we will explicitely set Store
+        p[0] = ast.Starred(value=p[2], ctx=Load)
 
     def p_yield_expr3(self, p):
         ''' yield_expr : YIELD FROM testlist '''

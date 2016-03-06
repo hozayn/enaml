@@ -166,6 +166,9 @@ class Python2EnamlParser(BaseEnamlParser):
         raise_stmt.tback = p[6]
         p[0] = raise_stmt
 
+    # List maker and related are not necessary as even in Python 2
+    # testlist_comp was equivalent
+
     def p_classdef3(self, p):
         ''' classdef : CLASS NAME LPAR testlist RPAR COLON suite '''
         classdef = ast.ClassDef(keywords=[])
