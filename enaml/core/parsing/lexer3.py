@@ -16,6 +16,8 @@ class Python3EnamlLexer(BaseEnamlLexer):
     """
     operators = BaseEnamlLexer.operators + ((r'->', 'RETURNARROW'),)
 
+    t_RETURNARROW = r'->'
+
     reserved = dict(list(BaseEnamlLexer.reserved.items()) +
                     [('nonlocal', 'NONLOCAL'),
                      ]
@@ -62,10 +64,10 @@ class Python35EnamlLexer(Python34EnamlLexer):
 
     operators = Python34EnamlLexer.operators + ((r'@=', 'ATEQUAL'),)
 
+    t_ATEQUAL = r'@='
+
     reserved = dict(list(Python34EnamlLexer.reserved.items()) +
                     [('async', 'ASYNC'),
                      ('await', 'AWAIT'),
                      ]
                     )
-
-    t_ATEQUAL = r'@='
