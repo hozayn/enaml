@@ -71,3 +71,50 @@ class Python35EnamlLexer(Python34EnamlLexer):
                      ('await', 'AWAIT'),
                      ]
                     )
+
+    def make_token_stream(self):
+        """Add analysis of ASYNC/AWAIT.
+
+        """
+        token_stream = super(Python35EnamlLexer, self).make_token_stream()
+        token_stream = self.analyse_async(token_stream)
+        return token_stream
+
+    def analyse_async(self, token_stream):
+        """Transform ASYNC/AWAIT tokens to NAME outside async function.
+
+        """
+        seen_async_def = False
+        async_depth = 0
+
+        for tok in token_stream:
+
+            if seen_async_def and tok.type == 'INDENT':
+                async_depth += 1
+                seen_async_def = False
+
+            elif tok.type == 'ASYNC':
+                next_token = next(token_stream)
+                if next_token.type == 'DEF':
+                    seen_async_def = True
+                else:
+                    self.handle_async_token(tok, async_depth)
+                yield tok
+                yield next_token
+                continue
+
+            elif tok.type == 'AWAIT':
+                self.handle_async_token(tok, async_depth)
+
+            elif async_depth and tok.type == 'DEDENT':
+                async_depth -= 1
+
+            yield tok
+
+    def handle_async_token(self, tok, async_depth):
+        """Handle an ASYNC/AWAIT token depending on whether or not we are
+        inside a coroutine definition.
+
+        """
+        if not async_depth:
+            tok.type = 'NAME'
