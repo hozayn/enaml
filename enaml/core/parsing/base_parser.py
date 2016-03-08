@@ -2480,16 +2480,20 @@ class BaseEnamlParser(object):
         p[0] = node
 
     def p_power1(self, p):
-        ''' power : atom '''
+        ''' power : atom_expr '''
         p[0] = p[1]
 
     def p_power2(self, p):
-        ''' power : atom DOUBLESTAR factor '''
+        ''' power : atom_expr DOUBLESTAR factor '''
         node = ast.BinOp(left=p[1], op=ast.Pow(), right=p[3])
         p[0] = node
 
-    def p_power3(self, p):
-        ''' power : atom power_list '''
+    def p_atom_expr1(self, p):
+        ''' atom_expr : atom '''
+        p[0] = p[1]
+
+    def p_atom_expr2(self, p):
+        ''' atom_expr : atom trailer_list '''
         root = p[1]
         for node in p[2]:
             if isinstance(node, ast.Call):
@@ -2501,30 +2505,14 @@ class BaseEnamlParser(object):
             else:
                 raise TypeError('Unexpected trailer node: %s' % node)
             root = node
-        p[0] = root
+        p[0] = node
 
-    def p_power4(self, p):
-        ''' power : atom power_list DOUBLESTAR factor '''
-        root = p[1]
-        for node in p[2]:
-            if isinstance(node, ast.Call):
-                node.func = root
-            elif isinstance(node, ast.Attribute):
-                node.value = root
-            elif isinstance(node, ast.Subscript):
-                node.value = root
-            else:
-                raise TypeError('Unexpected trailer node: %s' % node)
-            root = node
-        power = ast.BinOp(left=root, op=ast.Pow(), right=p[4])
-        p[0] = power
-
-    def p_power_list1(self, p):
-        ''' power_list : trailer '''
+    def p_trailer_list1(self, p):
+        ''' trailer_list : trailer '''
         p[0] = [p[1]]
 
-    def p_power_list2(self, p):
-        ''' power_list : power_list trailer '''
+    def p_trailer_list2(self, p):
+        ''' trailer_list : trailer_list trailer '''
         p[0] = p[1] + [p[2]]
 
     def p_atom1(self, p):

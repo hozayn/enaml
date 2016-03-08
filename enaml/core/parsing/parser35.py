@@ -24,7 +24,7 @@ class Python35EnamlParser(Python34EnamlParser):
     lexer = Python35EnamlLexer
 
     augassign_table = dict(list(Python34EnamlParser.augassign_table.items()) +
-                           [('@=', ast.MatMult)])
+                           [('@=', ast.MatMult())])
 
     _NOTIFICATION_DISALLOWED =\
         dict(list(Python34EnamlParser._NOTIFICATION_DISALLOWED.items()) +
@@ -78,66 +78,77 @@ class Python35EnamlParser(Python34EnamlParser):
                       | ATEQUAL '''
         super(Python35EnamlParser, self).p_augassign(p)
 
+    def p_term_op5(self, p):
+        ''' term_op : AT factor '''
+        p[0] = [ast.MatMult(), p[2]]
+
     def p_dosm_colon(self, p):
         ''' dosm_colon : DOUBLESTAR expr '''
         p[0] = (None, p[2])
 
-#    def p_compound_stmt(self, p):
-#        ''' compound_stmt : if_stmt
-#                          | while_stmt
-#                          | for_stmt
-#                          | try_stmt
-#                          | with_stmt
-#                          | funcdef
-#                          | async_funcdef
-#                          | classdef
-#                          | decorated '''
-#        super(Python35EnamlParser, self).p_compound_stmt(p)
-#
-#    def p_decorated(self, p):
-#        ''' decorated : decorators funcdef
-#                      | decorators classdef
-#                      | decorators async_funcdef'''
-#        decs = p[1]
-#        target = p[2]
-#        target.decorator_list = decs
-#        p[0] = target
+    def p_compound_stmt(self, p):
+        ''' compound_stmt : if_stmt
+                          | while_stmt
+                          | for_stmt
+                          | try_stmt
+                          | with_stmt
+                          | funcdef
+                          | classdef
+                          | decorated
+                          | async_funcdef
+                          | async_for_stmt
+                          | async_with_stmt '''
+        super(Python35EnamlParser, self).p_compound_stmt(p)
 
-#    def p_async_funcdef1(self, p):
-#        ''' async_funcdef : ASYNC DEF NAME parameters COLON async_suite '''
-#        funcdef = ast.AsyncFunctionDef()
-#        funcdef.name = p[2]
-#        funcdef.args = p[3]
-#        funcdef.body = p[5]
-#        funcdef.decorator_list = []
-#        funcdef.lineno = p.lineno(1)
-#        ast.fix_missing_locations(funcdef)
-#        p[0] = funcdef
-#
-#    def p_async_funcdef2(self, p):
-#        ''' async_funcdef : ASYNC DEF NAME parameters RIGHTARROW test COLON async_suite '''
-#        funcdef = ast.AsyncFunctionDef()
-#        funcdef.name = p[2]
-#        funcdef.args = p[3]
-#        funcdef.body = p[7]
-#        funcdef.decorator_list = []
-#        funcdef.lineno = p.lineno(1)
-#        ast.fix_missing_locations(funcdef)
-#        p[0] = funcdef
-#
-#    def p_async_suite1(self, p):
-#        ''' async_suite : async_simple_stmt '''
-#        # stmt may be a list of simple_stmt due to this piece of grammar:
-#        # simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
-#        stmt = p[1]
-#        if isinstance(stmt, list):
-#            res = stmt
-#        else:
-#            res = [stmt]
-#        p[0] = res
-#
-#    def p_async_suite2(self, p):
-#        ''' async_suite : NEWLINE INDENT async_stmt_list DEDENT '''
-#        p[0] = p[3]
+    def p_decorated(self, p):
+        ''' decorated : decorators funcdef
+                      | decorators classdef
+                      | decorators async_funcdef'''
+        decs = p[1]
+        target = p[2]
+        target.decorator_list = decs
+        p[0] = target
 
-# XXXX support for await and async for async with
+    def p_async_funcdef1(self, p):
+        ''' async_funcdef : ASYNC funcdef '''
+        async_funcdef = ast.AsyncFunctionDef()
+        funcdef = p[2]
+        for attr in ('name', 'args', 'body', 'returns', 'decorator_list',
+                     'lineno'):
+            setattr(async_funcdef, attr, getattr(funcdef, attr))
+        p[0] = async_funcdef
+
+    def p_async_for_stmt(self, p):
+        ''' async_for_stmt : ASYNC for_stmt '''
+        async_for = ast.AsyncFor()
+        for_node = p[2]
+        for attr in ('target', 'iter', 'body', 'orelse'):
+            setattr(async_for, attr, getattr(for_node, attr))
+        p[0] = async_for
+
+    def p_async_with_stmt(self, p):
+        ''' async_with_stmt : ASYNC with_stmt '''
+        async_with = ast.AsyncWith()
+        with_node = p[2]
+        for attr in ('items', 'body'):
+            setattr(async_with, attr, getattr(with_node, attr))
+        p[0] = async_with
+
+    def p_atom_expr3(self, p):
+        ''' atom_expr : AWAIT atom '''
+        p[0] = ast.Await(value=p[1])
+
+    def p_atom_expr4(self, p):
+        ''' atom_expr : AWAIT atom trailer_list '''
+        root = p[2]
+        for node in p[3]:
+            if isinstance(node, ast.Call):
+                node.func = root
+            elif isinstance(node, ast.Attribute):
+                node.value = root
+            elif isinstance(node, ast.Subscript):
+                node.value = root
+            else:
+                raise TypeError('Unexpected trailer node: %s' % node)
+            root = node
+        p[0] = ast.Await(value=node)
