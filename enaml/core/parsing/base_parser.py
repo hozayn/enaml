@@ -778,6 +778,7 @@ class BaseEnamlParser(object):
         ast.FunctionDef: 'function definition',
         ast.ClassDef: 'class definition',
         ast.Yield: 'yield statement',
+        ast.GeneratorExp: 'generator expressions',
     }
 
     def _validate_decl_funcdef(self, funcdef, lexer):

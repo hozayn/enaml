@@ -218,13 +218,13 @@ CO_NESTED      = 0x0010
 CO_GENERATOR   = 0x0020
 CO_NOFREE      = 0x0040
 
-if version_info >= (3, 5,):
+if version_info >= (3, 5):
     CO_COROUTINE          = 0x0080
     CO_ITERABLE_COROUTINE = 0x0100
 
 CO_FUTURE_BARRY_AS_BDFL = 0x40000
 
-if version_info >= (3, 5,):
+if version_info >= (3, 5):
     CO_FUTURE_GENERATOR_STOP = 0x80000
 
 
@@ -316,7 +316,7 @@ class Code(object):
         n = len(co_code)
         i = extended_arg = 0
         is_generator = False
-        if version_info >= (3, 5,):
+        if version_info >= (3, 5):
             is_coroutine = False
 
         while i < n:
@@ -359,14 +359,14 @@ class Code(object):
             if op == YIELD_VALUE or op == YIELD_FROM:
                 is_generator = True
 
-            if version_info >= (3, 5,) and op in coroutine_opcodes:
+            if version_info >= (3, 5) and op in coroutine_opcodes:
                 is_coroutine = True
 
         varargs = not not co.co_flags & CO_VARARGS
         varkwargs = not not co.co_flags & CO_VARKEYWORDS
         force_generator = not is_generator and (co.co_flags & CO_GENERATOR)
 
-        if version_info >= (3, 5,):
+        if version_info >= (3, 5):
             force_coroutine = not is_coroutine and (co.co_flags & CO_COROUTINE)
             force_iterable_coroutine = co.co_flags & CO_ITERABLE_COROUTINE
             assert not (force_coroutine and force_iterable_coroutine)
@@ -407,7 +407,7 @@ class Code(object):
                     self.force_generator != other.force_generator or
                     len(self.code) != len(other.code)):
                 return False
-            elif version_info >= (3, 5,):
+            elif version_info >= (3, 5):
                 if (self.force_coroutine != other.force_coroutine or
                         self.force_iterable_coroutine != other.force_iterable_coroutine or
                         self.future_generator_stop != other.future_generator_stop):
@@ -652,7 +652,7 @@ class Code(object):
                         log = cur_state.newlog("END_FINALLY (-6)")
                         op += State(next_pos, cur_state.newstack(-6), cur_state.block_stack, log),
 
-                elif o == SETUP_WITH or (version_info >= (3, 5,) and o == SETUP_ASYNC_WITH):
+                elif o == SETUP_WITH or (version_info >= (3, 5) and o == SETUP_ASYNC_WITH):
                     inside_with_block = cur_state.newlog("SETUP_WITH, with-block (+1, +block)")
                     inside_finally_block = cur_state.newlog("SETUP_WITH, finally (+1)")
                     op += State(label_pos[arg], cur_state.newstack(1), cur_state.block_stack, inside_finally_block),\
@@ -667,7 +667,7 @@ class Code(object):
                     op += State(next_pos, cur_state.newstack(-1), cur_state.block_stack, log),\
                           State(next_pos, cur_state.newstack(-7) + (8,), cur_state.block_stack + (BlockType.SILENCED_EXCEPTION_BLOCK,), silenced_exception_log)
 
-                elif version_info >= (3, 5,) and o == WITH_CLEANUP_START:
+                elif version_info >= (3, 5) and o == WITH_CLEANUP_START:
                     # There is special case when 'with' __exit__ function returns True,
                     # that's the signal to silence exception, in this case additional element is pushed
                     # and next END_FINALLY command won't reraise exception.
@@ -678,7 +678,7 @@ class Code(object):
                     op += State(next_pos, cur_state.newstack(1), cur_state.block_stack, log),\
                           State(next_pos, cur_state.newstack(-7) + (9,), cur_state.block_stack + (BlockType.SILENCED_EXCEPTION_BLOCK,), silenced_exception_log)
 
-                elif version_info >= (3, 5,) and o == WITH_CLEANUP_FINISH:
+                elif version_info >= (3, 5) and o == WITH_CLEANUP_FINISH:
                     if cur_state.block_stack[-1] == BlockType.SILENCED_EXCEPTION_BLOCK:
                         # See comment in WITH_CLEANUP_START handler
                         log = cur_state.newlog("WITH_CLEANUP_FINISH silenced_exception (-1)")
@@ -704,7 +704,7 @@ class Code(object):
         is_generator = self.force_generator or (YIELD_VALUE in co_flags or YIELD_FROM in co_flags)
         no_free = (not self.freevars) and (not co_flags & hasfree)
 
-        if version_info >= (3, 5,):
+        if version_info >= (3, 5):
             is_native_coroutine = bool(self.force_coroutine or (co_flags & coroutine_opcodes))
             assert not (is_native_coroutine and self.force_iterable_coroutine)
 
@@ -717,7 +717,7 @@ class Code(object):
             (no_free and CO_NOFREE) |\
             (nested and CO_NESTED)
 
-        if version_info >= (3, 5,):
+        if version_info >= (3, 5):
             co_flags |= (is_native_coroutine and CO_COROUTINE) |\
                         (self.force_iterable_coroutine and CO_ITERABLE_COROUTINE) |\
                         (self.future_generator_stop and CO_FUTURE_GENERATOR_STOP)
@@ -765,7 +765,7 @@ class Code(object):
                         co_lnotab += b"\xFF\0"
                         incr_pos -= 255
                     while incr_lineno > 255:
-                        co_lnotab += bytes((incr_pos, 255))
+                        co_lnotab += (0xFF00|incr_pos).to_bytes(2, "little")
                         incr_pos = 0
                         incr_lineno -= 255
                     if incr_pos or incr_lineno:
@@ -773,7 +773,7 @@ class Code(object):
             elif op == opcode.EXTENDED_ARG:
                 self.code[i + 1][1] |= 1 << 32
             elif op not in hasarg:
-                co_code += bytes((op,))
+                co_code.append(op)
             else:
                 if op in hasconst:
                     if isinstance(arg, Code) and\
@@ -785,7 +785,7 @@ class Code(object):
                     arg = index(co_names, arg)
                 elif op in hasjump:
                     jumps.append((len(co_code), arg))
-                    co_code += bytes((op, 0, 0))
+                    co_code += op.to_bytes(3, "little")
                     continue
                 elif op in haslocal:
                     arg = index(co_varnames, arg)
@@ -797,17 +797,24 @@ class Code(object):
                     except IndexError:
                         arg = index(co_cellvars, arg)
                 if arg > 0xFFFF:
-                    co_code += bytes((opcode.EXTENDED_ARG, arg >> 16 & 0xFF, arg >> 24 & 0xFF))
-                co_code += bytes((op, arg & 0xFF, arg >> 8 & 0xFF))
+                    co_code += (opcode.EXTENDED_ARG | ((arg & 0xFFFF0000) >> 8)).to_bytes(3, "little")
+                co_code += (op | (arg << 8)).to_bytes(3, "little")
 
         for pos, label in jumps:
-            jump = label_pos[label]
+            try:
+                jump = label_pos[label]
+            except KeyError:
+                for op, arg in self.code:
+                    print(op, arg)
+                print(label_pos)
+                print(jumps)
+                raise
             if co_code[pos] in hasjrel:
                 jump -= pos + 3
             if jump > 0xFFFF:
                 raise NotImplementedError("Extended jumps not implemented")
             co_code[pos + 1] = jump & 0xFF
-            co_code[pos + 2] = jump >> 8 & 0xFF
+            co_code[pos + 2] = jump >> 8
 
         co_argcount = len(self.args) - self.varargs - self.varkwargs - self.kwonly
         co_stacksize = self._compute_stacksize()
