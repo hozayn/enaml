@@ -801,14 +801,7 @@ class Code(object):
                 co_code += (op | (arg << 8)).to_bytes(3, "little")
 
         for pos, label in jumps:
-            try:
-                jump = label_pos[label]
-            except KeyError:
-                for op, arg in self.code:
-                    print(op, arg)
-                print(label_pos)
-                print(jumps)
-                raise
+            jump = label_pos[label]
             if co_code[pos] in hasjrel:
                 jump -= pos + 3
             if jump > 0xFFFF:
