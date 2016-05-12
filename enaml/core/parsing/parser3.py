@@ -386,7 +386,7 @@ def _make_typedarg_rule(f, name):
     return rule
 
 
-for f in filter(lambda x: 'varargslist' in x, dir(Python3EnamlParser)):
+for f in (x for x in dir(Python3EnamlParser) if 'varargslist' in x):
     name = f.replace('varargslist', 'typedargslist')
     setattr(Python3EnamlParser, name,
             _make_typedarg_rule(getattr(Python3EnamlParser, f), name))
