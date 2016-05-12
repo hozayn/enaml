@@ -899,14 +899,14 @@ MOD_INIT_FUNC(signaling)
         INITERROR;
     PyObject* mod_dict = PyModule_GetDict( mod.get() );
 
-    PyObjectPtr wm_mod( PyImport_ImportModuleEx( "weakmethod", mod_dict, 0, 0 ) );
+    PyObjectPtr wm_mod( PyImport_ImportModuleLevel( "weakmethod", mod_dict, 0, 0 , 1) );
     if( !wm_mod)
         INITERROR;
     PyObjectPtr wm_cls( wm_mod.get_attr( "WeakMethod" ) );
     if( !wm_cls )
         INITERROR;
 
-    PyObjectPtr cr_mod( PyImport_ImportModuleEx( "callableref", mod_dict, 0, 0 ) );
+    PyObjectPtr cr_mod( PyImport_ImportModuleLevel( "callableref", mod_dict, 0, 0, 1 ) );
     if( !cr_mod )
         INITERROR;
     PyObjectPtr cr_cls( cr_mod.get_attr( "CallableRef" ) );
